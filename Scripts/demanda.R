@@ -1,4 +1,8 @@
 ### En este script se arregla la informacion de demanda y tarifas a un formato de tabla long
+
+
+# Demanda -----------------------------------------------------------------
+
 library(tidyverse)
 library(readxl)
 
@@ -11,4 +15,11 @@ demanda <- read_excel("Modelo/Intermodal/Ingresos.xlsx",sheet = "Demanda") %>%
 
 names(demanda)[2] <- "Ramp.Up" # Utilizo un punto para hacer mas facil la referencia a esta columna
 
-tarifas <- read_excel("Modelo/Intermodal/Ingresos.xlsx", sheet= "Tarifas")
+
+
+# Tarifas -----------------------------------------------------------------
+
+tarifas <- read_excel("Modelo/Intermodal/Ingresos.xlsx", sheet= "Tarifas") %>%
+  gather(Year,Tarifa.dols, -TARIFAS)
+
+names(tarifas)[1] <- "Sistema"
