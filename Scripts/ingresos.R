@@ -10,5 +10,6 @@ ingresos <- left_join(tarifas,demanda)
 # Desde este momento se utilizara la demanda minima para modelar los ingresos
 # Considerar que luego debo de tener una forma de cambiar la columna de demanda, la cual debera de ser influenciada por el modelo a crear.
 ingresos <- ingresos %>%
-  mutate(Ingresos.Brutos = ifelse(Sistema!="Ferrocarril",Tarifa.dols*pct.mercado*Ramp.Up*MIN*2,Tarifa.dols*pct.mercado*Ramp.Up*MIN))
+  mutate(Ingresos.Brutos = ifelse(Sistema!="Ferrocarril",Tarifa.dols*pct.mercado*Ramp.Up*MIN*2,Tarifa.dols*pct.mercado*Ramp.Up*MIN),
+         Mercado=ifelse(Sistema!="Ferrocarril",pct.mercado*Ramp.Up*MIN,pct.mercado*Ramp.Up*MIN))
 
