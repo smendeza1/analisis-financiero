@@ -13,3 +13,9 @@ ingresos <- ingresos %>%
   mutate(Ingresos.Brutos = ifelse(Sistema!="Ferrocarril",Tarifa.dols*pct.mercado*Ramp.Up*MIN*2,Tarifa.dols*pct.mercado*Ramp.Up*MIN),
          Mercado=ifelse(Sistema!="Ferrocarril",pct.mercado*Ramp.Up*MIN,pct.mercado*Ramp.Up*MIN))
 
+ingresos$Infraestructura <- ifelse(ingresos$Sistema!="Ferrocarril","Puertos","Ferrocarril")
+
+ingresos <- ingresos %>% 
+  select(Ingresos.Brutos,Year,Infraestructura) %>%
+  group_by(Year,Infraestructura)%>%
+  summarise_all(sum)
