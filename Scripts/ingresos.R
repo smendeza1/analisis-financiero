@@ -19,3 +19,5 @@ ingresos <- ingresos %>%
   select(Ingresos.Brutos,Year,Infraestructura) %>%
   group_by(Year,Infraestructura)%>%
   summarise_all(sum)
+
+ingresos <- replace_na(ingresos, replace = list(Ingresos.Brutos=0))
