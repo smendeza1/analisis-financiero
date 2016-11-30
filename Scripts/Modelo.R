@@ -10,7 +10,7 @@ cashflow <- mutate(cashflow,fen=Ingresos.Brutos-Explotación-Mantenimiento-Repos
 
 cashflow %>%
   group_by(Infraestructura)%>%
-  summarise(vpn=scales::dollar(npv_f(fen,0.08)*1000))
+  summarise(vpn=npv2_f(fen,0.08)*1000) # Multiplico por 1000 porque los datos vienen divididos por un factor de 1000
 
 
 
