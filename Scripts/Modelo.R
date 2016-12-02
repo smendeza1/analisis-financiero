@@ -1,12 +1,30 @@
-source("Scripts/Costos e Inversiones.R")
+source("Scripts/financiamiento.R")
 source("Scripts/ingresos.R")
 source("Scripts/fin101.R")
 #Función de Financiamiento y Amortizaciones
 
 cashflow <- full_join(full_join(ingresos,Costos),Inversiones)
 
-cashflow <- mutate(cashflow,fen=Ingresos.Brutos-Explotación-Mantenimiento-Reposición-Inversion.Infraestructura-Inversion.Superestructura) %>%
-  filter(Year<=2050)
+# Para estimar el monto de inversiones de capital se utiliza 1-pct.financiado
+
+cashflow$Inversion.Infraestructura <- cashflow$Inversion.Infraestructura*(1-pct.financiado)
+cashflow$Inversion.Superestructura <- cashflow$Inversion.Superestructura*(1-pct.financiado)
+
+cashflow <- cashflow %>%
+  filter(Year<=2080)%>%
+  mutate(Year=as.numeric(Year))%>%
+  select(-Infraestructura)%>%
+  group_by(Year) %>%
+  summarise_all(sum)
+  
+cashflow <- full_join(cashflow,pago.financiamiento[c(1,5)],by="Year")
+
+
+cashflow <- cashflow %>%
+  mutate(fen=Ingresos.Brutos-Explotación-Mantenimiento-Reposición-Inversion.Infraestructura-Inversion.Superestructura-Pago)%>%
+  replace_na(list(fen=0))
+
+scales::dollar(npv_f(cash_flows = cashflow$fen,0.08)*1e+6)
 
 cashflow %>%
   group_by(Infraestructura)%>%
@@ -16,5 +34,5 @@ cashflow %>%
 
 #Impuestos
 
-
+rm(list = ls())
 
