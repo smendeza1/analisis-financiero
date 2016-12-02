@@ -1,6 +1,5 @@
 # Amortizaciones
 source("Scripts/Costos e Inversiones.R")
-source("Scripts/fin101.R")
 
 
 # Creacion de funcion de amortización -------------------------------------
@@ -24,10 +23,10 @@ i.super <- Inversiones %>%
 # r <- 0.05 # Tasa a la que se trabaja
 # pg <- 3 # Años de gracia para poder construir los sistemas
 
-amortizacion <- function(n=30,r=0.05,inversion){
+amortizacion <- function(n=30,r=0.05,inversion,pct.financiado=1){
 
   names(inversion)[3] <- "Inversion"
-
+  inversion$Inversion <-  inversion$Inversion*pct.financiado 
 # Prueba logica para determinar periodo de gracia -------------------------
 
   year.inversion <- as.numeric(inversion$Year) # año en que se realiza la inversion
@@ -78,27 +77,31 @@ return(escenario)
 
 }
 
-
 # Calculo de amortizaciones para cada inversión ---------------------------
-
-
+pct.financiado = 0.6
 inversion = i.infr[1,]
-escenario <- amortizacion(inversion=inversion)
+escenario <- amortizacion(inversion=inversion,pct.financiado = pct.financiado)
 escenario$tipo.inversion <- "Inversion.Infraestructura"
 escenario
 
 for(i in 2:nrow(i.infr)){
   inversion = i.infr[i,]
-  tmp <- amortizacion(inversion=inversion)
+  tmp <- amortizacion(inversion=inversion,pct.financiado = pct.financiado)
   tmp$tipo.inversion <- "Inversion.Infraestructura"
   escenario <- rbind(escenario,tmp)
   }
 
 for(i in 1:nrow(i.super)){
   inversion = i.super[i,]
-  tmp <- amortizacion(inversion=inversion)
+  tmp <- amortizacion(inversion=inversion,pct.financiado = pct.financiado)
   tmp$tipo.inversion <- "Inversion.superaestructura"
   escenario <- rbind(escenario,tmp)
 }
+rm(tmp,i.infr,i.super,i)
+
+#Este data.frame es el que se usa para el modelo del cashflow
+pago.financiamiento <- escenario %>% mutate(tipo.inversion=as.factor(tipo.inversion)) %>%
+  group_by(Year) %>%
+  summarise(Saldo=sum(Saldo),Intereses=sum(Intereses),Amortizacion=sum(Amortizacion),Pago=sum(Pago))
 
 
