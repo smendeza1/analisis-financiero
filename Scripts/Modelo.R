@@ -21,10 +21,11 @@ cashflow <- full_join(cashflow,pago.financiamiento[c(1,5)],by="Year")
 
 
 cashflow <- cashflow %>%
-  mutate(fen=Ingresos.Brutos-Explotación-Mantenimiento-Reposición-Inversion.Infraestructura-Inversion.Superestructura-Pago)%>%
+  mutate(fen=Ingresos.Brutos*(1-0.17)-Explotación-Mantenimiento-Reposición-Inversion.Infraestructura-Inversion.Superestructura-Pago)%>%
   replace_na(list(fen=0))
 
-scales::dollar(npv_f(cash_flows = cashflow$fen,0.08)*1e+6)
+cashflow$fen <- cashflow$fen*(1-0)
+scales::dollar(npv_f(cash_flows = cashflow$fen,0.08)/1e+6)
 
 cashflow %>%
   group_by(Infraestructura)%>%
