@@ -39,7 +39,7 @@ amortizacion <- function(n=30,r=0.05,inversion,pct.financiado=1){
   primer.ingreso <- min(as.numeric(primer.ingreso$Year)) # año en el que existe el primer ingreso
   
   if(year.inversion< primer.ingreso  ){
-    pg = primer.ingreso - year.inversion -1 
+    pg = primer.ingreso - year.inversion - 1
   }else{
     pg = 0 
   }
@@ -67,7 +67,6 @@ if(pg==0){
   escenario <- escenario %>% 
     mutate(Saldo = inversion$Inversion-cumsum(escenario$Amortizacion),
            Intereses = (Saldo+Amortizacion)*r)
-  escenario$Intereses[1:pg] <- 0 # Set de periodo de gracia
 }
 
 escenario  <- escenario %>% mutate(Pago=Intereses+Amortizacion)
