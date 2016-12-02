@@ -64,19 +64,41 @@ if(pg==0){
            Intereses = (Saldo+Amortizacion)*r)
   
 }else {
-  escenario$Amortizacion[1:pg] <- 0 # Seteo de periodo de gracia
+  escenario$Amortizacion[1:pg] <- 0 # Set de periodo de gracia
   escenario <- escenario %>% 
     mutate(Saldo = inversion$Inversion-cumsum(escenario$Amortizacion),
            Intereses = (Saldo+Amortizacion)*r)
-  escenario$Intereses[1:pg] <- 0 # Seteo de periodo de gracia
+  escenario$Intereses[1:pg] <- 0 # Set de periodo de gracia
 }
 
 escenario  <- escenario %>% mutate(Pago=Intereses+Amortizacion)
+escenario$Infraestructura <-inversion$Infraestructura
 return(escenario)
+
+
 }
 
-amortizacion(inversion = i.super[8,])
+
+# Calculo de amortizaciones para cada inversión ---------------------------
 
 
+inversion = i.infr[1,]
+escenario <- amortizacion(inversion=inversion)
+escenario$tipo.inversion <- "Inversion.Infraestructura"
+escenario
+
+for(i in 2:nrow(i.infr)){
+  inversion = i.infr[i,]
+  tmp <- amortizacion(inversion=inversion)
+  tmp$tipo.inversion <- "Inversion.Infraestructura"
+  escenario <- rbind(escenario,tmp)
+  }
+
+for(i in 1:nrow(i.super)){
+  inversion = i.super[i,]
+  tmp <- amortizacion(inversion=inversion)
+  tmp$tipo.inversion <- "Inversion.superaestructura"
+  escenario <- rbind(escenario,tmp)
+}
 
 
