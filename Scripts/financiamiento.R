@@ -39,7 +39,7 @@ amortizacion <- function(n=30,r=0.05,inversion,pct.financiado=1){
   primer.ingreso <- min(as.numeric(primer.ingreso$Year)) # año en el que existe el primer ingreso
   
   if(year.inversion< primer.ingreso  ){
-    pg = primer.ingreso - year.inversion - 1
+    pg = primer.ingreso - year.inversion
   }else{
     pg = 0 
   }
@@ -53,7 +53,7 @@ escenario <- data_frame(Year=numeric(n+pg),
                         Saldo=numeric(n+pg),
                         Intereses =numeric(n+pg),
                         Amortizacion=numeric(n+pg))
-escenario$Year <- seq_len(n+pg) + as.numeric(inversion$Year) # Llenado de los años correspondientes al escenario
+escenario$Year <- seq_len(n+pg) + as.numeric(inversion$Year)-1 # Llenado de los años correspondientes al escenario
 escenario$Amortizacion <- inversion$Inversion/n # Calculo de los pagos de amortización anuales
 
 if(pg==0){
@@ -69,7 +69,7 @@ if(pg==0){
            Intereses = (Saldo+Amortizacion)*r)
 }
 
-escenario  <- escenario %>% mutate(Pago=Intereses+Amortizacion)
+escenario  <- escenario %>% mutate(Pago=ifelse(Amortizacion==0,0,Intereses+Amortizacion))
 escenario$Infraestructura <-inversion$Infraestructura
 return(escenario)
 
@@ -96,11 +96,25 @@ for(i in 1:nrow(i.super)){
   tmp$tipo.inversion <- "Inversion.superaestructura"
   escenario <- rbind(escenario,tmp)
 }
-rm(tmp,i.infr,i.super,i)
+
 
 #Este data.frame es el que se usa para el modelo del cashflow
 pago.financiamiento <- escenario %>% mutate(tipo.inversion=as.factor(tipo.inversion)) %>%
   group_by(Year) %>%
   summarise(Saldo=sum(Saldo),Intereses=sum(Intereses),Amortizacion=sum(Amortizacion),Pago=sum(Pago))
 
+tmp<-Inversiones %>% 
+  select(-Infraestructura)%>%
+  group_by(Year)%>%
+  summarise(credito.necesario=sum(Inversion.Infraestructura+Inversion.Superestructura)*pct.financiado)
+tmp$Year <- as.numeric(tmp$Year)
 
+pago.financiamiento <- left_join(pago.financiamiento,tmp)
+
+# Calculo de primer año de inversion
+min.infr <-min(i.infr$Year)
+min.super <-min(i.super$Year)
+
+year.inversion <- as.numeric(if_else(min.infr<=min.super,min.infr,min.super))
+
+rm(tmp,i.infr,i.super,i,min.infr,min.super)

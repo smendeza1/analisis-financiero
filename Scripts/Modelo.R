@@ -19,21 +19,23 @@ cashflow <- cashflow %>%
   
 cashflow <- full_join(cashflow,pago.financiamiento[c(1,5)],by="Year")
 
+cashflow <- cashflow %>% replace_na(list(Pago=0))
 
 cashflow <- cashflow %>%
-  mutate(fen=Ingresos.Brutos*(1-0.17)-Explotación-Mantenimiento-Reposición-Inversion.Infraestructura-Inversion.Superestructura-Pago)%>%
-  replace_na(list(fen=0))
+  mutate(fen=Ingresos.Brutos*(1-0.17)   
+         -Explotación-Mantenimiento
+         -Reposición
+         -Inversion.Infraestructura
+         -Inversion.Superestructura
+         -Pago,
+         fen= if_else(Year<year.inversion,0,fen))
 
-cashflow$fen <- cashflow$fen*(1-0)
+# El 1-0.17 refleja los impuestos de IVA y 5% de ISR
+
 scales::dollar(npv_f(cash_flows = cashflow$fen,0.08)/1e+6)
 
-cashflow %>%
-  group_by(Infraestructura)%>%
-  summarise(vpn=npv2_f(fen,0.08)*1000/1e+9) # Multiplico por 1000 porque los datos vienen divididos por un factor de 1000
 
+qplot(data=cashflow,Year,fen,geom = "line")+
+  geom_abline(intercept = 0,col="grey")
 
-
-#Impuestos
-
-rm(list = ls())
 
