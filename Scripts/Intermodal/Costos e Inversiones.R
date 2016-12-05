@@ -4,7 +4,7 @@ library(stringr)
 
 Sys.setlocale("LC_ALL","es_ES.UTF-8")
 
-Costos <- read_excel("Modelo/Intermodal/Costos e Inversiones.xlsx",sheet="Costos")
+Costos <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Costos")
 
 Costos <- Costos%>%
   gather(Year,Valor,-Infraestructura,-Costos.Operación,-Categoria)%>%
@@ -16,7 +16,7 @@ Costos$Costos.Operación<-str_trim(Costos$Costos.Operación)
 
 Costos <- Costos %>% spread(Costos.Operación,Valor)
 
-Inversiones <- read_excel("Modelo/Intermodal/Costos e Inversiones.xlsx",sheet="Inversiones")
+Inversiones <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Inversiones")
 
 Inversiones <- Inversiones%>%
   gather(Year, Valor,-Sistema,-Tipo,-Caterogoría,-Fase)%>%
