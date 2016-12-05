@@ -7,20 +7,20 @@ Sys.setlocale("LC_ALL","es_ES.UTF-8")
 Costos <- read_excel("Modelo/Intermodal/Costos e Inversiones.xlsx",sheet="Costos")
 
 Costos <- Costos%>%
-  gather(Year,Valor,-Infraestructura,-Costos.Operación,-Categoria)%>%
+  gather(Year,Valor,-Infraestructura,-Costos.Operacion,-Categoria)%>%
   select(-Categoria)%>%
-  group_by(Year,Infraestructura,Costos.Operación)%>%
+  group_by(Year,Infraestructura,Costos.Operacion)%>%
   summarise(Valor=sum(Valor))
 
-Costos$Costos.Operación<-str_trim(Costos$Costos.Operación)
+Costos$Costos.Operacion<-str_trim(Costos$Costos.Operacion)
 
-Costos <- Costos %>% spread(Costos.Operación,Valor)
+Costos <- Costos %>% spread(Costos.Operacion,Valor)
 
 Inversiones <- read_excel("Modelo/Intermodal/Costos e Inversiones.xlsx",sheet="Inversiones")
 
 Inversiones <- Inversiones%>%
-  gather(Year, Valor,-Sistema,-Tipo,-Caterogoría,-Fase)%>%
-  select(-Caterogoría,-Fase)%>%
+  gather(Year, Valor,-Sistema,-Tipo,-Categoria,-Fase)%>%
+  select(-Categoria,-Fase)%>%
   group_by(Sistema,Year,Tipo)%>%
   summarise(Valor=sum(Valor))%>%
   spread(Sistema,Valor)%>%
