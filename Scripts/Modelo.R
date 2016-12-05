@@ -23,7 +23,7 @@ cashflow <- cashflow %>% replace_na(list(Pago = 0))
 
 cashflow <- cashflow %>%
   mutate(
-    fen = Ingresos.Brutos * (1 - 0.17) # El 1-0.17 refleja el pago de impuestos por concepto de 12% de IVA y 5% de ISR
+    fen = Ingresos.Brutos * (1 - 0.12) # El 1-0.17 refleja el pago de impuestos por concepto de 12% de IVA y 5% de ISR
     - Explotación - Mantenimiento
     - Reposición
     - Inversion.Infraestructura
@@ -38,7 +38,7 @@ scales::dollar(npv_f(cash_flows = cashflow$fen,0.08)/1e+6)
 
 
 
-qplot(data = cashflow, Year, fen, geom = "line") +
+qplot(data = cashflow, Year, fen, geom = "col") +
   geom_abline(intercept = 0, col = "grey")
 
 
