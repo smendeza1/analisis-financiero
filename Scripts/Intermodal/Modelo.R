@@ -1,6 +1,6 @@
-source("Scripts/financiamiento.R")
-source("Scripts/ingresos.R")
-source("Scripts/fin101.R")
+source("Scripts/Intermodal/financiamiento.R")
+source("Scripts/Intermodal/ingresos.R")
+source("Scripts/Source/fin101.R")
 #Función de Financiamiento y Amortizaciones
 
 cashflow <- full_join(full_join(ingresos,Costos),Inversiones)
