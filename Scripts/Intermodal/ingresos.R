@@ -1,4 +1,4 @@
-source("Scripts/demanda.R")
+source("Scripts/Intermodal/demanda.R")
 
 # Se asume que la cantidad de TEUS movidos por cada puerto sera exactamente la mitad de la demanda disponible para cada puerto.
 # En el caso del ferrocarril, se asume que el 100% de los TEUS disponibles seran movilizados

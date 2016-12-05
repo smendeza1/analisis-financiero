@@ -1,5 +1,5 @@
 # Amortizaciones
-source("Scripts/Costos e Inversiones.R")
+source("Scripts/Intermodal/Costos e Inversiones.R")
 
 
 # Creacion de funcion de amortización -------------------------------------
@@ -30,7 +30,7 @@ amortizacion <- function(n=30,r=0.05,inversion,pct.financiado=1){
 # Prueba logica para determinar periodo de gracia -------------------------
 
   year.inversion <- as.numeric(inversion$Year) # año en que se realiza la inversion
-  source("Scripts/ingresos.R")
+  source("Scripts/Intermodal/ingresos.R")
   
   primer.ingreso <- ingresos %>% filter(Ingresos.Brutos!=0) %>%
     group_by(Year)%>%

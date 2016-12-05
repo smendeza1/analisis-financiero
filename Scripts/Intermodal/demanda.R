@@ -6,9 +6,9 @@
 library(tidyverse)
 library(readxl)
 
-excel_sheets("Modelo/Intermodal/Ingresos.xlsx")
+excel_sheets("Datos/Intermodal/Ingresos.xlsx")
 
-demanda <- read_excel("Modelo/Intermodal/Ingresos.xlsx",sheet = "Demanda") %>%
+demanda <- read_excel("Datos/Intermodal/Ingresos.xlsx",sheet = "Demanda") %>%
   gather(Year,TEUS,-Escenario) %>%
   replace_na(demanda,replace = list(TEUS=0)) %>%
   spread(Escenario,TEUS)
@@ -19,7 +19,7 @@ names(demanda)[2] <- "Ramp.Up" # Utilizo un punto para hacer mas facil la refere
 
 # Tarifas -----------------------------------------------------------------
 
-tarifas <- read_excel("Modelo/Intermodal/Ingresos.xlsx", sheet= "Tarifas") %>%
+tarifas <- read_excel("Datos/Intermodal/Ingresos.xlsx", sheet= "Tarifas") %>%
   gather(Year,Tarifa.dols, -TARIFAS)
 
 names(tarifas)[1] <- "Sistema"
