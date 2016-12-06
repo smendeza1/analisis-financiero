@@ -9,10 +9,10 @@ Costos <- read_excel("Datos/Energia/Corredor Energia.xlsx",sheet="Costos")
 Inversiones <- read_excel("Datos/Energia/Corredor Energia.xlsx",sheet="Inversiones")
 
 Ingresos <- Ingresos%>%
-  gather(Year,Valor,3:length(Ingresos))%>%
+  gather(Year,Ingresos.Brutos,3:length(Ingresos))%>%
   rename(Infraestructura=Sistema)
 Ingresos <- Ingresos%>%
-  select(Year,Infraestructura,Ingresos.Operación,Valor)%>%
+  select(Year,Infraestructura,Ingresos.Operación,Ingresos.Brutos)%>%
   rename(Ingresos.Operacion=Ingresos.Operación)
 
 Costos <- Costos%>%
