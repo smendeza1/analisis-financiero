@@ -14,7 +14,7 @@ cashflow$Year <- as.numeric(cashflow$Year)
 
 cashflow <- cashflow %>%
   filter(Year <= 2080) %>%
-  select(-Infraestructura,-Ingresos.Operacion)%>%
+  select(-Infraestructura)%>%
   group_by(Year) %>%
   summarise_all(sum)
 
