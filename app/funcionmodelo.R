@@ -1,9 +1,9 @@
 # Información utilizada por la función para poder funcionar
 # source("famortizacion.R") # funciones para calculos financieros
-# demanda2 <- read_excel("Datos/Intermodal/Ingresos.xlsx",sheet = "Demanda")
-# tarifas2 <- read_excel("Datos/Intermodal/Ingresos.xlsx", sheet= "Tarifas")
-# Costos2 <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Costos")
-# Inversiones2 <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Inversiones")
+demanda2 <- read_excel("Datos/Intermodal/Ingresos.xlsx",sheet = "Demanda")
+tarifas2 <- read_excel("Datos/Intermodal/Ingresos.xlsx", sheet= "Tarifas")
+Costos2 <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Costos")
+Inversiones2 <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Inversiones")
 
 require(shiny)
 require(tidyverse)

@@ -1,7 +1,8 @@
 
 # Interfaz gráfica --------------------------------------------------------
 
-ui <- fluidPage(
+ui <- navbarPage("Análisis Financiero",
+  tabPanel("VPN",
   sidebarLayout(
     sidebarPanel(
       sliderInput("años.financiamiento",label = "Años financiamiento",value = 30,max=50,min=5),
@@ -19,5 +20,6 @@ ui <- fluidPage(
       tabPanel("Flujo Efectivo",plotOutput("fen")))
   )
   )
+)
 )
 
