@@ -198,7 +198,7 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
   resultados <- paste("El vpn es de: ",resultados[1]," millones y la TIR de:",resultados[2])
   
   p <- qplot(data = cashflow, Year, fen/1e+3, geom = "line") +
-    geom_v
+    geom_hline(yintercept = 0,col="grey")+
     scale_x_continuous(breaks = pretty_breaks(10),name = "Año")+
     scale_y_continuous(breaks = pretty_breaks(10),name = "$",labels = dollar)+
     theme_light(base_family = "Open Sans")
