@@ -27,4 +27,21 @@ server <- function(input, output) {
            Inversiones = Inversiones2)
     r[[1]]
   })
+  
+  output$fen <- renderPlot({
+    
+    r <- modelo(n=input$años.financiamiento,
+                r=input$tasa.financiamiento,
+                pct.financiado=input$pct.financiado,
+                tipo.demanda = input$tipo.demanda,
+                isr=input$isr,
+                demanda=demanda2,
+                tarifas = tarifas2,
+                Costos = Costos2,
+                Inversiones = Inversiones2)
+    r[[2]]
+  })
+  
+  
+  
 }

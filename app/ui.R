@@ -12,7 +12,9 @@ ui <- fluidPage(
                    choices = list("Demanda Minima"="min","Demanda Maxima"="max"),
                    selected = "min")
     ),
-    mainPanel(textOutput("modelo"))
+    mainPanel(h1("Resultado analisis"),
+              textOutput("modelo"),
+              plotOutput("fen"))
   )
 )
 
