@@ -10,7 +10,6 @@ library(FinCal)
 tipo.demanda = "min"
 n <- 30 # Años de financiamiento
 r <- 0.05 # Tasa a la que se trabaja
-pg <- 3 # Años de gracia para poder construir los sistemas
 pct.financiado <- 0.6
 isr <- 0.07
 
@@ -26,7 +25,7 @@ Inversiones <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="In
 source("Scripts/Intermodal/famortizacion.R") # funciones para calculos financieros
 
 
-modelo
+modelo <- function(n=30,r=0.05,pct.financiado=0.6,isr=0.07){
 
 # Demanda -----------------------------------------------------------------
 demanda <- demanda %>%
@@ -184,7 +183,6 @@ cashflow <- cashflow %>%
 vpn <- npv(0.08,cashflow$fen)/1e+6
 
 irr <- irr(cashflow$fen)
-
-vpn
-irr
-
+resultados <- c(vpn,irr)
+return(resultados)
+}

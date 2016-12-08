@@ -4,7 +4,7 @@
 ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
-      sliderInput("años.financiamiento",label = "Años financiamiento",value = 30,max=50,min=20),
+      sliderInput("años.financiamiento",label = "Años financiamiento",value = 30,max=50,min=5),
       sliderInput("tasa.financiamiento","Tasa financiamiento",value=0.05,max=0.1,min=0.01,step = 0.005),
       sliderInput("pct.financiado","Porcentaje Inversion Financiada",min = 0,max=1,value=0.6),
       sliderInput("isr","Impuesto sobre la renta: Sobre ingresos",min=0.01,max=0.1,value=0.07,step=0.005),

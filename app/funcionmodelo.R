@@ -1,20 +1,31 @@
-# source("Scripts/Intermodal/famortizacion.R") # funciones para calculos financieros
-# demanda2 <- read_excel("Datos/Intermodal/Ingresos.xlsx",sheet = "Demanda")
-# tarifas2 <- read_excel("Datos/Intermodal/Ingresos.xlsx", sheet= "Tarifas")
-# Costos2 <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Costos")
-# Inversiones2 <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Inversiones")
-# 
-# r=0.02
-# n=30
-# pct.financiado=0.6
-# tipo.demanda="min"
-# isr=0.07
+source("famortizacion.R") # funciones para calculos financieros
+demanda2 <- read_excel("Datos/Intermodal/Ingresos.xlsx",sheet = "Demanda")
+tarifas2 <- read_excel("Datos/Intermodal/Ingresos.xlsx", sheet= "Tarifas")
+Costos2 <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Costos")
+Inversiones2 <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Inversiones")
+
+require(shiny)
+require(tidyverse)
+require(readxl)
+require(stringr)
+require(FinCal)
 
 modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=demanda2,
                    tarifas=tarifas2,Costos=Costos2,Inversiones=Inversiones2,isr=0.07){
-  
-  # Demanda -----------------------------------------------------------------
-  demanda <- demanda2 %>%
+
+  # 
+  # n=30
+  # r=0.05
+  # pct.financiado=0.6
+  # tipo.demanda="min"
+  # demanda=demanda2
+  # tarifas=tarifas2
+  # Costos=Costos2
+  # Inversiones=Inversiones2
+  # isr=0.07
+  # 
+ # Demanda -----------------------------------------------------------------
+  demanda <- demanda %>%
     gather(Year,TEUS,-Escenario) %>%
     replace_na(demanda,replace = list(TEUS=0)) %>%
     spread(Escenario,TEUS)
@@ -24,7 +35,7 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
   
   # Tarifas -----------------------------------------------------------------
   
-  tarifas <- tarifas2 %>%
+  tarifas <- tarifas %>%
     gather(Year,Tarifa.dols, -TARIFAS)
   
   names(tarifas)[1] <- "Sistema"
@@ -46,10 +57,12 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
     ingresos <- ingresos %>%
       mutate(Ingresos.Brutos = if_else(Sistema!="Ferrocarril",Tarifa.dols*pct.mercado*Ramp.Up*MIN*2,Tarifa.dols*pct.mercado*Ramp.Up*MIN),
              Mercado=pct.mercado*Ramp.Up*MIN) 
+
   }else{
     ingresos <- ingresos %>%
       mutate(Ingresos.Brutos = if_else(Sistema!="Ferrocarril",Tarifa.dols*pct.mercado*Ramp.Up*MAX*2,Tarifa.dols*pct.mercado*Ramp.Up*MAX),
              Mercado=pct.mercado*Ramp.Up*MAX) 
+
   }
   
 
@@ -66,7 +79,7 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
   
   # Costos e inversiones ----------------------------------------------------
   
-  Costos <- Costos2%>%
+  Costos <- Costos%>%
     gather(Year,Valor,-Infraestructura,-Costos.Operacion,-Categoria)%>%
     select(-Categoria)%>%
     group_by(Year,Infraestructura,Costos.Operacion)%>%
@@ -76,7 +89,7 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
   
   Costos <- Costos %>% spread(Costos.Operacion,Valor)
   
-  Inversiones <- Inversiones2%>%
+  Inversiones <- Inversiones%>%
     gather(Year, Valor,-Sistema,-Tipo,-Categoria,-Fase)%>%
     select(-Categoria,-Fase)%>%
     group_by(Sistema,Year,Tipo)%>%
@@ -103,19 +116,19 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
   # Calculo de amortizaciones para cada inversión 
   
   inversion = i.infr[1,]
-  escenario <- amortizacion(inversion=inversion,pct.financiado = pct.financiado,n = n,r = r)
+  escenario <- amortizacion(inversion=inversion,pct.financiado = pct.financiado,n = n,r = r,ingresos = ingresos)
   escenario$tipo.inversion <- "Inversion.Infraestructura"
   
   for(i in 2:nrow(i.infr)){
     inversion = i.infr[i,]
-    tmp <- amortizacion(inversion=inversion,pct.financiado = pct.financiado)
+    tmp <- amortizacion(inversion=inversion,pct.financiado = pct.financiado,ingresos=ingresos)
     tmp$tipo.inversion <- "Inversion.Infraestructura"
     escenario <- rbind(escenario,tmp)
   }
   
   for(i in 1:nrow(i.super)){
     inversion = i.super[i,]
-    tmp <- amortizacion(inversion=inversion,pct.financiado = pct.financiado)
+    tmp <- amortizacion(inversion=inversion,pct.financiado = pct.financiado,ingresos=ingresos)
     tmp$tipo.inversion <- "Inversion.superaestructura"
     escenario <- rbind(escenario,tmp)
   }
@@ -184,4 +197,4 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
   return(resultados)
 }
 
-
+modelo()
