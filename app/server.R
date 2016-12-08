@@ -24,7 +24,8 @@ server <- function(input, output) {
            demanda=demanda2,
            tarifas = tarifas2,
            Costos = Costos2,
-           Inversiones = Inversiones2)
+           Inversiones = Inversiones2,
+           tasa.descuento = input$tasa.descuento)
     r[[1]]
   })
   

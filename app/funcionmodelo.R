@@ -10,13 +10,16 @@ require(tidyverse)
 require(readxl)
 require(stringr)
 require(FinCal)
+require(scales)
 
 modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=demanda2,
-                   tarifas=tarifas2,Costos=Costos2,Inversiones=Inversiones2,isr=0.07){
+                   tarifas=tarifas2,Costos=Costos2,Inversiones=Inversiones2,isr=0.07,
+                   tasa.descuento=0.08){
 
   # Datos para realizar modificaciones a la función
   # n=30
   # r=0.05
+  # tasa.descuento = 0.08
   # pct.financiado=0.6
   # tipo.demanda="min"
   # demanda=demanda2
@@ -188,14 +191,17 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
       fen = if_else(Year < year.inversion, 0, fen)
     )
   
-  vpn <- npv(0.08,cashflow$fen)/1e+6
+  vpn <- round(npv(tasa.descuento,cashflow$fen)/1e+3,0)
 
   irr <- irr(cashflow$fen)
   resultados <- c(`VPN en B $US`=scales::dollar(vpn),TIR=scales::percent(irr))
-  resultados <- paste("El vpn es de: ",resultados[1]," billones y la TIR de:",resultados[2])
+  resultados <- paste("El vpn es de: ",resultados[1]," millones y la TIR de:",resultados[2])
   
-  p <- qplot(data = cashflow, Year, fen, geom = "line") +
-    geom_abline(intercept = 0, col = "grey")
+  p <- qplot(data = cashflow, Year, fen/1e+3, geom = "line") +
+    geom_v
+    scale_x_continuous(breaks = pretty_breaks(10),name = "Año")+
+    scale_y_continuous(breaks = pretty_breaks(10),name = "$",labels = dollar)+
+    theme_light(base_family = "Open Sans")
   
   resultados <- list(resultados,p)
     return(resultados)
