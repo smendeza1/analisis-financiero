@@ -16,7 +16,7 @@ Inversiones2 <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="I
 server <- function(input, output) {
   output$modelo <- renderText({
 
-    modelo(n=input$años.financiamiento,
+    r <- modelo(n=input$años.financiamiento,
            r=input$tasa.financiamiento,
            pct.financiado=input$pct.financiado,
            tipo.demanda = input$tipo.demanda,
@@ -25,5 +25,6 @@ server <- function(input, output) {
            tarifas = tarifas2,
            Costos = Costos2,
            Inversiones = Inversiones2)
+    r[[1]]
   })
 }

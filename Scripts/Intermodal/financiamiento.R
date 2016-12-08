@@ -77,7 +77,7 @@ return(escenario)
 }
 
 # Calculo de amortizaciones para cada inversión ---------------------------
-
+pct.financiado= 0.6
 inversion = i.infr[1,]
 escenario <- amortizacion(inversion=inversion,pct.financiado = pct.financiado)
 escenario$tipo.inversion <- "Inversion.Infraestructura"
