@@ -3,6 +3,7 @@
 
 ui <- navbarPage(title="Analisis Financiero",
                  inverse = TRUE,
+                 footer = div("  Elaborado por:  ",img(src="axon2.png")), 
   tabPanel("VPN",
   sidebarLayout(
     sidebarPanel(
