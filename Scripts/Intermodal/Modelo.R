@@ -1,4 +1,6 @@
+
 source("Scripts/Intermodal/financiamiento.R")
+tipo.demanda="min"
 source("Scripts/Intermodal/ingresos.R")
 source("Scripts/Source/fin101.R")
 #Función de Financiamiento y Amortizaciones
@@ -37,8 +39,9 @@ cashflow <- cashflow %>%
 scales::dollar(npv_f(cash_flows = cashflow$fen,0.08)/1e+6)
 
 
-
-qplot(data = cashflow, Year, fen, geom = "col") +
-  geom_abline(intercept = 0, col = "grey")
+source("Scripts/Source/theme_axon.R")
+qplot(data = cashflow, Year, fen, geom = "line") +
+  geom_abline(intercept = 0, col = "grey")+
+  theme_axon()
 
 
