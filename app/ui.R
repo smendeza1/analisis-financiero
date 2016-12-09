@@ -1,7 +1,8 @@
 
 # Interfaz gráfica --------------------------------------------------------
 
-ui <- navbarPage("Análisis Financiero",
+ui <- navbarPage(title="Analisis Financiero",
+                 inverse = TRUE,
   tabPanel("VPN",
   sidebarLayout(
     sidebarPanel(
