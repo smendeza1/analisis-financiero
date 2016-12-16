@@ -1,9 +1,9 @@
-# Información utilizada por la función para poder funcionar
-# source("famortizacion.R") # funciones para calculos financieros
-demanda2 <- read_excel("Datos/Intermodal/Ingresos.xlsx",sheet = "Demanda")
-tarifas2 <- read_excel("Datos/Intermodal/Ingresos.xlsx", sheet= "Tarifas")
-Costos2 <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Costos")
-Inversiones2 <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Inversiones")
+# # Información utilizada por la función para poder funcionar
+# source("app/famortizacion.R") # funciones para calculos financieros
+# demanda2 <- read_excel("Datos/Intermodal/Ingresos.xlsx",sheet = "Demanda")
+# tarifas2 <- read_excel("Datos/Intermodal/Ingresos.xlsx", sheet= "Tarifas")
+# Costos2 <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Costos")
+# Inversiones2 <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx",sheet="Inversiones")
 
 require(shiny)
 require(tidyverse)
@@ -13,21 +13,25 @@ require(FinCal)
 require(scales)
 
 modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=demanda2,
-                   tarifas=tarifas2,Costos=Costos2,Inversiones=Inversiones2,isr=0.07,
-                   tasa.descuento=0.08){
+                   tarifas=tarifas2,Costos=Costos2,Inversiones=Inversiones2,isr=0.07,isr2=0.25,
+                   tasa.descuento=0.08,horizonte=2080,regimen.fiscal = FALSE){
 
-  # Datos para realizar modificaciones a la función
-  # n=30
-  # r=0.05
-  # tasa.descuento = 0.08
-  # pct.financiado=0.6
-  # tipo.demanda="min"
-  # demanda=demanda2
-  # tarifas=tarifas2
-  # Costos=Costos2
-  # Inversiones=Inversiones2
-  # isr=0.07
-  
+# ##Datos para realizar modificaciones a la función
+# n=30
+# r=0.05 ## Regimen sobre ingresos
+# r2=0.25 ## Regimen sobre utilidades
+# tasa.descuento = 0.08
+# pct.financiado=0.6
+# tipo.demanda="min"
+# demanda=demanda2
+# tarifas=tarifas2
+# Costos=Costos2
+# Inversiones=Inversiones2
+# isr=0.07
+# isr2=0.25
+# horizonte=2080
+# regimen.fiscal = FALSE ## en donde FALSE indica regimen sobre ingresos
+
  # Demanda -----------------------------------------------------------------
   demanda <- demanda %>%
     gather(Year,TEUS,-Escenario) %>%
