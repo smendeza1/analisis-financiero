@@ -190,7 +190,16 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
   
   # Creación de FEN ----------------------------------------------------------
   
-  cashflow <- full_join(full_join(ingresos,Costos),Inversiones)
+  cashflow <- full_join(
+    full_join(
+      full_join(ingresos, Costos),
+      Inversiones,
+      by = c("Year", "Infraestructura")
+    ),
+    impuestos.simple,
+    by = c("Year", "Infraestructura")
+  )%>%
+    select(-contains("IVAx"))
   
   # Para estimar el monto de inversiones de capital se utiliza 1-pct.financiado
   
@@ -198,41 +207,85 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
   cashflow$Inversion.Superestructura <- cashflow$Inversion.Superestructura*(1-pct.financiado)
   
   cashflow <- cashflow %>%
-    filter(Year <= 2080) %>%
+    filter(Year <= horizonte) %>%
     mutate(Year = as.numeric(Year)) %>%
     select(-Infraestructura) %>%
     group_by(Year) %>%
     summarise_all(sum)
   
-  cashflow <- full_join(cashflow, pago.financiamiento[c(1, 5)], by = "Year")
+  cashflow <- full_join(cashflow, pago.financiamiento[c(1, 5,6)], by = "Year")
   
-  cashflow <- cashflow %>% replace_na(list(Pago = 0))
+  cashflow <- cashflow %>% replace_na(list(Pago = 0,credito.necesario=0))
+  
+  if (regimen.fiscal==FALSE){
   
   cashflow <- cashflow %>%
     mutate(
-      fen = Ingresos.Brutos * (1 - 0.12-isr) # El 1-0.17 refleja el pago de impuestos por concepto de 12% de IVA y 5% de ISR
-      - Explotación - Mantenimiento
+      IVA.Neto = if_else(IVA.Neto>0,0,IVA.Neto),
+      fen = Ingresos.Brutos  
+      - Explotación 
+      - Mantenimiento
       - Reposición
       - Inversion.Infraestructura
       - Inversion.Superestructura
-      - Pago,
-      fen = if_else(Year < year.inversion, 0, fen)
+      - Pago
+      - credito.necesario
+      + IVA.Neto
+      - ISR, # ISR regimen sobre ingresos
+      fen = if_else(Year < year.inversion, 0, fen),
+      inversion.total = (Inversion.Infraestructura+Inversion.Superestructura+credito.necesario),
+      gastos.explotacion = (Explotación+Mantenimiento+Reposición)
     )
+  }else{
+  
+    cashflow <- cashflow %>%
+      mutate(
+        IVA.Neto = if_else(IVA.Neto>0,0,IVA.Neto),
+        ISR2 = (Ingresos.Brutos-Explotación-Mantenimiento-Reposición)*isr2,
+        fen = Ingresos.Brutos  
+        - Explotación 
+        - Mantenimiento
+        - Reposición
+        - Inversion.Infraestructura
+        - Inversion.Superestructura
+        - Pago
+        - credito.necesario
+        + IVA.Neto
+        - ISR2, # ISR regimen sobre utilidades
+        fen = if_else(Year < year.inversion, 0, fen),
+        inversion.total = (Inversion.Infraestructura+Inversion.Superestructura+credito.necesario),
+        gastos.explotacion = (Explotación+Mantenimiento+Reposición)
+      )  
+  }
+  
+  
+# calculo tesoreria -------------------------------------------------------
+
+  tesoreria <- cashflow %>%
+    select(Year,Inversion.Superestructura,Inversion.Infraestructura) %>%
+    left_join(pago.financiamiento)%>%
+    select(Year,Inversion.Superestructura,Inversion.Infraestructura,credito.necesario)%>%
+    replace_na(replace = list(credito.necesario=0))%>%
+    mutate(intereses.ganados=0.01*(Inversion.Superestructura+Inversion.Infraestructura+credito.necesario))
+ # Calculo VPN y ISR -------------------------------------------------------
+  
+  
   
   vpn <- round(npv(tasa.descuento,cashflow$fen)/1e+3,0)
-
   irr <- irr(cashflow$fen)
   resultados <- c(`VPN en B $US`=scales::dollar(vpn),TIR=scales::percent(irr))
   resultados <- paste("El vpn es de: ",resultados[1]," millones y la TIR de:",resultados[2])
   
-  p <- qplot(data = cashflow, Year, fen/1e+3, geom = "line") +
+  qplot(data = cashflow, Year, fen/1e+3, geom = "line") +
     geom_hline(yintercept = 0,col="grey")+
     scale_x_continuous(breaks = pretty_breaks(10),name = "Año")+
     scale_y_continuous(breaks = pretty_breaks(10),name = "$",labels = dollar)+
+    geom_text(aes(label=round(fen/1e+3,0)))+
     theme_light(base_family = "Open Sans")
   
   resultados <- list(resultados,p)
     return(resultados)
 }
 
-modelo()
+
+
