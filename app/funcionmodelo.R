@@ -289,3 +289,4 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
 
 
 
+
