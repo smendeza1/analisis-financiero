@@ -153,14 +153,14 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
   
   for(i in 2:nrow(i.infr)){
     inversion = i.infr[i,]
-    tmp <- amortizacion(inversion=inversion,pct.financiado = pct.financiado,ingresos=ingresos)
+    tmp <- amortizacion(inversion=inversion,pct.financiado = pct.financiado,ingresos=ingresos,n = n,r = r)
     tmp$tipo.inversion <- "Inversion.Infraestructura"
     escenario <- rbind(escenario,tmp)
   }
   
   for(i in 1:nrow(i.super)){
     inversion = i.super[i,]
-    tmp <- amortizacion(inversion=inversion,pct.financiado = pct.financiado,ingresos=ingresos)
+    tmp <- amortizacion(inversion=inversion,pct.financiado = pct.financiado,ingresos=ingresos,n = n,r = r)
     tmp$tipo.inversion <- "Inversion.superaestructura"
     escenario <- rbind(escenario,tmp)
   }
