@@ -82,7 +82,8 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
     group_by(Year,Infraestructura)%>%
     summarise_all(sum)
   
-  ingresos <- replace_na(ingresos, replace = list(Ingresos.Brutos=0))
+  ingresos <- replace_na(ingresos, replace = list(Ingresos.Brutos=0))%>%
+    mutate(IVAxPagar=Ingresos.Brutos*0.12,ISR=Ingresos.Brutos*isr)
   
   
   # Costos e inversiones ----------------------------------------------------
@@ -95,7 +96,8 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
   
   Costos$Costos.Operacion<-str_trim(Costos$Costos.Operacion)
   
-  Costos <- Costos %>% spread(Costos.Operacion,Valor)
+  Costos <- Costos %>% spread(Costos.Operacion,Valor) %>%
+    mutate(IVAxCobrar=0.12*(Explotación+Mantenimiento))
   
   Inversiones <- Inversiones%>%
     gather(Year, Valor,-Sistema,-Tipo,-Categoria,-Fase)%>%
@@ -109,6 +111,28 @@ modelo <- function(n=30,r=0.05,pct.financiado=0.6,tipo.demanda="min",demanda=dem
     spread(Tipo,Valor)
   
   names(Inversiones)[3:4] <- c("Inversion.Infraestructura","Inversion.Superestructura")
+  
+  Inversiones <- Inversiones %>%
+    mutate(IVAxCobrar=0.12*(Inversion.Infraestructura+Inversion.Superestructura))
+  
+  
+  
+  # IVA e ISR ---------------------------------------------------------------------
+  
+  impuestos <- full_join(ingresos,Costos)%>%
+    select(Year,Infraestructura,contains("IVA"),ISR)%>%
+    # filter(Infraestructura=="Ferrocarril")%>%
+    full_join(Inversiones ,by=c("Year","Infraestructura"))%>%
+    select(-contains("Inversion"))%>%
+    group_by(Infraestructura)%>%
+    mutate(IVAxCobrar=IVAxCobrar.x+IVAxCobrar.y,
+           IVA.aux1 = cumsum(IVAxCobrar-IVAxPagar),
+           IVA.aux2 = IVAxCobrar-IVAxPagar,   
+           IVA.Neto = if_else(lag(IVA.aux1)<0,IVA.aux2,IVA.aux1))%>%
+    select(-IVAxCobrar.x,-IVAxCobrar.y,-contains("aux"))
+  
+  impuestos.simple <- impuestos %>%
+    select(Year,Infraestructura,IVA.Neto)
   
   
   # Financiamiento ----------------------------------------------------------
