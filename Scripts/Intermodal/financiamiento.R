@@ -77,7 +77,7 @@ return(escenario)
 }
 
 # Calculo de amortizaciones para cada inversión ---------------------------
-pct.financiado =0.6
+pct.financiado= 0.6
 inversion = i.infr[1,]
 escenario <- amortizacion(inversion=inversion,pct.financiado = pct.financiado)
 escenario$tipo.inversion <- "Inversion.Infraestructura"
@@ -118,3 +118,4 @@ min.super <-min(i.super$Year)
 year.inversion <- as.numeric(if_else(min.infr<=min.super,min.infr,min.super))
 
 rm(tmp,i.infr,i.super,i,min.infr,min.super)
+
