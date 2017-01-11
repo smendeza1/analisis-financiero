@@ -47,7 +47,7 @@ amortizacion <- function(n=30,r=0.05,inversion,pct.financiado=1,ingresos=ingreso
              Intereses = (Saldo+Amortizacion)*r)
   }
   
-  escenario  <- escenario %>% mutate(Pago=ifelse(Amortizacion==0,0,Intereses+Amortizacion))
+  escenario  <- escenario %>% mutate(Pago=Intereses+Amortizacion)
   escenario$Infraestructura <-inversion$Infraestructura
   return(escenario)
   

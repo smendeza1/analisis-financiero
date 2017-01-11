@@ -17,29 +17,36 @@ server <- function(input, output) {
   output$modelo <- renderText({
 
     r <- modelo(n=input$años.financiamiento,
-           r=input$tasa.financiamiento,
-           pct.financiado=input$pct.financiado,
-           tipo.demanda = input$tipo.demanda,
-           isr=input$isr,
-           demanda=demanda2,
-           tarifas = tarifas2,
-           Costos = Costos2,
-           Inversiones = Inversiones2,
-           tasa.descuento = input$tasa.descuento)
+           r              =input$tasa.financiamiento,
+           pct.financiado =input$pct.financiado,
+           tipo.demanda   =input$tipo.demanda,
+           isr            =input$isr,
+           isr2           =input$isr2,
+           demanda        =demanda2,
+           tarifas        =tarifas2,
+           Costos         =Costos2,
+           Inversiones    =Inversiones2,
+           tasa.descuento =input$tasa.descuento,
+           horizonte      =input$horizonte,
+           regimen.fiscal =input$regimen.fiscal)
     r[[1]]
   })
   
   output$fen <- renderPlot({
     
     r <- modelo(n=input$años.financiamiento,
-                r=input$tasa.financiamiento,
-                pct.financiado=input$pct.financiado,
-                tipo.demanda = input$tipo.demanda,
-                isr=input$isr,
-                demanda=demanda2,
-                tarifas = tarifas2,
-                Costos = Costos2,
-                Inversiones = Inversiones2)
+                r              =input$tasa.financiamiento,
+                pct.financiado =input$pct.financiado,
+                tipo.demanda   =input$tipo.demanda,
+                isr            =input$isr,
+                isr2           =input$isr2,
+                demanda        =demanda2,
+                tarifas        =tarifas2,
+                Costos         =Costos2,
+                Inversiones    =Inversiones2,
+                tasa.descuento =input$tasa.descuento,
+                horizonte      =input$horizonte,
+                regimen.fiscal =input$regimen.fiscal)
     r[[2]]
   })
   
