@@ -16,22 +16,18 @@ require(scales)
 
 
 # ##Datos para realizar modificaciones a la función
-n=30
-r=0.05 ## Regimen sobre ingresos
-r2=0.25 ## Regimen sobre utilidades
-tasa.descuento = 0.08
-pct.financiado=0.6
-tipo.demanda="min"
-demanda=demanda2
-tarifas=tarifas2
-Costos=Costos2
-Inversiones=Inversiones2
-isr=0.07
-isr2=0.25
-horizonte=2080
-regimen.fiscal = FALSE ## en donde FALSE indica regimen sobre ingresos
-split.puertos  = 0.5
-pct.royalty = 0.05
+n                 = 30
+r                 = 0.05 ## Regimen sobre ingresos
+r2                = 0.25 ## Regimen sobre utilidades
+tasa.descuento    = 0.08
+pct.financiado    = 0.6
+tipo.demanda      = "min"
+isr               = 0.07
+isr2              = 0.25
+horizonte         = 2080
+regimen.fiscal    = FALSE ## en donde FALSE indica regimen sobre ingresos
+split.puertos     = 0.5
+pct.royalty       = 0.05
 
 
 # Leyendas data frame -----------------------------------------------------
@@ -91,7 +87,7 @@ Tarifas$pct.mercado[Tarifas$Elemento == "San Jorge"] <- 1 - split.puertos
 
 # Tabla principal para modelar los ingresos
 Ingresos <- left_join(Tarifas, Demanda) %>%
-  mutate(Año = as.numeric(Año))
+  mutate(Año = as.factor(Año))
 
 
 # Seleccion de tipo de demanda para modelar los ingresos del sistema y elementos multimodales
@@ -102,7 +98,8 @@ if (tipo.demanda == "min") {
                                      Tarifa.dols*pct.mercado*Ramp.Up*MIN*2, 
                                      Tarifa.dols*pct.mercado*Ramp.Up*MIN),
            Mercado = pct.mercado*Ramp.Up*MIN,
-           Royalty = Ingresos.Brutos*pct.royalty) 
+           Royalty = Ingresos.Brutos*pct.royalty,
+           IVAxPagar = Ingresos.Brutos*0.12) 
   
 }else{
   Ingresos <- Ingresos %>%
@@ -110,13 +107,35 @@ if (tipo.demanda == "min") {
                                      Tarifa.dols*pct.mercado*Ramp.Up*MAX*2,
                                      Tarifa.dols*pct.mercado*Ramp.Up*MAX),
            Mercado = pct.mercado*Ramp.Up*MAX,
-           Royalty = Ingresos.Brutos*pct.royalty) 
+           Royalty = Ingresos.Brutos*pct.royalty,
+           IVAxPagar = Ingresos.Brutos*0.12) 
   
 }
 
 Ingresos <- Ingresos %>%
   mutate(Elemento = as.factor(Elemento),
-         Sistema = as.factor(Sistema))
+         Sistema = as.factor(Sistema)) %>%
+  select(Sistema, Elemento, Año, Ingresos.Brutos, Royalty, IVAxPagar)
+
+
+ Ingresos.poliducto <- Ingresos.poliducto %>%
+   gather(Año, Ingresos.Brutos, -Sistema,-Elemento ) %>%
+   mutate(Año = as.factor(Año),
+          Sistema = as.factor(Sistema),
+          Elemento = as.factor(Elemento),
+          Royalty = Ingresos.Brutos*pct.royalty,
+          IVAxPagar = Ingresos.Brutos*0.12)
+
+Ingresos <- Ingresos %>% bind_rows(Ingresos.poliducto)
+  
+ 
+# 
+# Ingresos.E11 <- Ingresos.poliducto %>%
+#   group_by(Año) %>%
+#   summarise(Ingresos.Brutos = sum(Valor))
+
+
+# Inversiones -------------------------------------------------------------
 
 
 ## Funcion que sirve para obtener los data frame para los distintos escenarios de negociación
@@ -224,7 +243,53 @@ valor.canon.infraestructura.sistema <- map(inversiones.sistema10,
 
 
 
-Ingresos
+Ingresos %>%
+  split(Ingresos$Sistema) %>%
+  group_by(Año) %>%
+  summarize(Ingresos.Brutos = sum(Ingresos.Brutos),
+            Mercado = sum(Mercado),
+            Royalty = sum(Royalty),
+            IVAxPagar = sum(IVAxPagar))
+
+segmentar_ingresos <- function(df = Inversiones, type) {
+  require(dplyr)
+  require(purrr)
+  
+  Ingresos %>%
+    
+  
+  
+  switch(type,
+         SF = df %>% 
+           mutate(Sistema = as.factor(Sistema)) %>%
+           split(df$Sistema) %>%
+           map(gather, Año, Valor, -c(Sistema:Fase)) %>%
+           map(mutate, Año = as.factor(Año)) %>%
+           map(group_by, Año) %>%
+           map(summarise, Inversion = sum(Valor)),
+         ST = df %>% 
+           mutate(Sistema = as.factor(Sistema)) %>%
+           split(df$Sistema) %>%
+           map(gather, Año, Valor, -c(Sistema:Fase)) %>%
+           map(mutate, Año = as.factor(Año)) %>%
+           map(group_by, Año, Componente) %>%
+           map(summarise, Inversion = sum(Valor)),
+         EF = df %>% 
+           mutate(Elemento = as.factor(Elemento)) %>%
+           split(df$Elemento) %>%
+           map(gather, Año, Valor, -c(Sistema:Fase)) %>%
+           map(mutate, Año = as.factor(Año)) %>%
+           map(group_by, Año) %>%
+           map(summarise, Inversion = sum(Valor)),
+         ET = df %>% 
+           mutate(Elemento = as.factor(Elemento)) %>%
+           split(df$Elemento) %>%
+           map(gather, Año, Valor, -c(Sistema:Fase)) %>%
+           map(mutate, Año = as.factor(Año)) %>%
+           map(group_by, Año, Componente) %>%
+           map(summarise, Inversion = sum(Valor)))
+  
+}
 
 # 
 # tmp <- Ingresos %>% mutate(Año = factor(Año)) %>% left_join(Ingresos.poliducto)
