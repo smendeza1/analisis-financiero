@@ -126,16 +126,33 @@ Ingresos <- Ingresos %>%
           Royalty = Ingresos.Brutos*pct.royalty,
           IVAxPagar = Ingresos.Brutos*0.12)
 
-Ingresos <- Ingresos %>% bind_rows(Ingresos.poliducto)
+Ingresos <- Ingresos %>% 
+  bind_rows(Ingresos.poliducto) %>%
+  mutate(Año = as.factor(Año),
+         Sistema = as.factor(Sistema),
+         Elemento = as.factor(Elemento))
+
+primer.año.ingreso <- min(Ingresos$Año[Ingresos$Ingresos.Brutos != 0])
+
+segmentar_ingreso <- function(df = Ingresos, type = "Sistema"){
   
- 
-# 
-# Ingresos.E11 <- Ingresos.poliducto %>%
-#   group_by(Año) %>%
-#   summarise(Ingresos.Brutos = sum(Valor))
+  switch(type,
+  Sistema = Ingresos %>%
+    split(Ingresos$Sistema) %>%
+    map(group_by, Año) %>%
+    map(select, -Elemento, -Sistema) %>%
+    map(summarise_all, sum),
+  Elemento = Ingresos %>%
+    split(Ingresos$Elemento) %>%
+    map(group_by, Año) %>%
+    map(select, -Elemento, -Sistema) %>%
+    map(summarise_all, sum))
+  }
+  
+ingresos_sistema11 <- segmentar_ingreso(type = "Sistema")
+ingresos_elemento11 <- segmentar_ingreso(type = "Elemento")
 
-
-# Inversiones -------------------------------------------------------------
+# Inversiones y canones de infraestructura y concesión -------------------------------------------------------------
 
 
 ## Funcion que sirve para obtener los data frame para los distintos escenarios de negociación
@@ -150,28 +167,32 @@ segmentar_inversion <- function(df = Inversiones, type) {
            map(gather, Año, Valor, -c(Sistema:Fase)) %>%
            map(mutate, Año = as.factor(Año)) %>%
            map(group_by, Año) %>%
-           map(summarise, Inversion = sum(Valor)),
+           map(summarise, Inversion = sum(Valor)) %>% 
+           map(mutate, IVAxCobrar = Inversion*0.12),
          ST = df %>% 
            mutate(Sistema = as.factor(Sistema)) %>%
            split(df$Sistema) %>%
            map(gather, Año, Valor, -c(Sistema:Fase)) %>%
            map(mutate, Año = as.factor(Año)) %>%
            map(group_by, Año, Componente) %>%
-           map(summarise, Inversion = sum(Valor)),
+           map(summarise, Inversion = sum(Valor)) %>% 
+           map(mutate, IVAxCobrar = Inversion*0.12),
          EF = df %>% 
            mutate(Elemento = as.factor(Elemento)) %>%
            split(df$Elemento) %>%
            map(gather, Año, Valor, -c(Sistema:Fase)) %>%
            map(mutate, Año = as.factor(Año)) %>%
            map(group_by, Año) %>%
-           map(summarise, Inversion = sum(Valor)),
+           map(summarise, Inversion = sum(Valor)) %>% 
+           map(mutate, IVAxCobrar = Inversion*0.12),
          ET = df %>% 
            mutate(Elemento = as.factor(Elemento)) %>%
            split(df$Elemento) %>%
            map(gather, Año, Valor, -c(Sistema:Fase)) %>%
            map(mutate, Año = as.factor(Año)) %>%
            map(group_by, Año, Componente) %>%
-           map(summarise, Inversion = sum(Valor)))
+           map(summarise, Inversion = sum(Valor)) %>% 
+           map(mutate, IVAxCobrar = Inversion*0.12))
   
 }
 inversiones.sistema11 <- segmentar_inversion(Inversiones, type = "SF")
@@ -179,12 +200,23 @@ inversiones.sistema10 <- segmentar_inversion(Inversiones, type = "ST")
 inversiones.elemento11 <- segmentar_inversion(Inversiones, type = "EF")
 inversiones.elemento10 <- segmentar_inversion(Inversiones, type = "ET")
 
+inversiones.elemento11
+
 ## Funcion que sirve para calcular los anticipos y las anualidades de cada canon
 ## en donde canon puede referirse al valor de renta de infraestructura o concesión del corredor
+
 canon.infraestructura <- function(df, 
                                   tasa.descuento.ice = 0.04, 
                                   n.canon = 30, 
-                                  pct.pago.anticipado = 0.1){
+                                  pct.pago.anticipado = 0.1,
+                                  año.primer.ingreso = 2018){
+  
+  
+  res <- data.frame(Año = numeric(n.canon + 1),
+                    Canon.infr = numeric(n.canon + 1))
+  
+  res[1] <- año.primer.ingreso - 3
+  res[1] <- seq_len(n.canon + 1) + res[1] - 1
   
   inversion.tmp <- npv(r = tasa.descuento.ice, 
                        c(0,df$Infraestructura))
@@ -194,15 +226,17 @@ canon.infraestructura <- function(df,
                                    pv = inversion.tmp,
                                    fv = 0)*1.05*n.canon*pct.pago.anticipado
   
-  inversion.tmp <- inversion.tmp*(1-pct.pago.anticipado)
+  res[1,2] <- pago.anticipado
+  
+  inversion.tmp <- inversion.tmp*(1 - pct.pago.anticipado)
   
   pago <- -pmt(r = tasa.descuento.ice,
        n = n.canon,
        pv = inversion.tmp,
        fv = 0)*1.05
-
   
-  res <- list(pago = pago, pago.anticipado = pago.anticipado)
+  res[2:nrow(res),2] <- pago
+  res$Año <- as.factor(res$Año)
   res
   }
 
@@ -226,101 +260,65 @@ canon.concesion <- function(valor = 5500000,
   res
 }
 
-
+## estos valores de canon me van a servir para los escenario 10 y 00
 
 valor.canon.infraestructura.elemento <- map(inversiones.elemento10, 
                                             spread, 
                                             Componente, 
                                             Inversion) %>% 
-  map(canon.infraestructura)
+                                        map(canon.infraestructura)
 
 
 valor.canon.infraestructura.sistema <- map(inversiones.sistema10, 
                                             spread, 
                                             Componente, 
                                             Inversion) %>% 
-  map(canon.infraestructura)
+                                       map(canon.infraestructura)
 
 
+# Costos ------------------------------------------------------------------
 
-Ingresos %>%
-  split(Ingresos$Sistema) %>%
-  group_by(Año) %>%
-  summarize(Ingresos.Brutos = sum(Ingresos.Brutos),
-            Mercado = sum(Mercado),
-            Royalty = sum(Royalty),
-            IVAxPagar = sum(IVAxPagar))
-
-segmentar_ingresos <- function(df = Inversiones, type) {
+Costos
+segmentar_costos <- function(df = Costos, type) {
   require(dplyr)
   require(purrr)
-  
-  Ingresos %>%
-    
-  
   
   switch(type,
          SF = df %>% 
            mutate(Sistema = as.factor(Sistema)) %>%
            split(df$Sistema) %>%
-           map(gather, Año, Valor, -c(Sistema:Fase)) %>%
+           map(gather, Año, Valor, -c(Sistema:Componente)) %>%
            map(mutate, Año = as.factor(Año)) %>%
            map(group_by, Año) %>%
-           map(summarise, Inversion = sum(Valor)),
+           map(summarise, Costos = sum(Valor)),
          ST = df %>% 
            mutate(Sistema = as.factor(Sistema)) %>%
            split(df$Sistema) %>%
-           map(gather, Año, Valor, -c(Sistema:Fase)) %>%
+           map(gather, Año, Valor, -c(Sistema:Componente)) %>%
            map(mutate, Año = as.factor(Año)) %>%
            map(group_by, Año, Componente) %>%
            map(summarise, Inversion = sum(Valor)),
          EF = df %>% 
            mutate(Elemento = as.factor(Elemento)) %>%
            split(df$Elemento) %>%
-           map(gather, Año, Valor, -c(Sistema:Fase)) %>%
+           map(gather, Año, Valor, -c(Sistema:Componente)) %>%
            map(mutate, Año = as.factor(Año)) %>%
            map(group_by, Año) %>%
            map(summarise, Inversion = sum(Valor)),
          ET = df %>% 
            mutate(Elemento = as.factor(Elemento)) %>%
            split(df$Elemento) %>%
-           map(gather, Año, Valor, -c(Sistema:Fase)) %>%
+           map(gather, Año, Valor, -c(Sistema:Componente)) %>%
            map(mutate, Año = as.factor(Año)) %>%
            map(group_by, Año, Componente) %>%
            map(summarise, Inversion = sum(Valor)))
   
 }
 
-# 
-# tmp <- Ingresos %>% mutate(Año = factor(Año)) %>% left_join(Ingresos.poliducto)
-# 
-# Ingresos.M11 <- Ingresos %>%
-#   group_by(Año) %>%
-#   summarise(Ingresos.Brutos = sum(Ingresos.Brutos))
-# 
-# Ingresos.M10 <- Ingresos %>%
-#   group_by(Año) %>%
-#   summarise(Ingresos.Brutos = sum(Ingresos.Brutos),
-#             Royalty = sum(Royalty)) %>%
-#   mutate(Royalty = lag(Royalty)) ## Se debe de agregar los canones por el valor de la infraestructura y de la tierra
-#   
-# 
-# Ingresos.M10 %>% mutate(Royalty = lag(Royalty))
-# 
-# Ingresos.M10 <- Ingresos %>%
-#   group_by(Año) %>%
-#   summarise(Ingresos.Brutos = sum(Ingresos.Brutos),
-#             Royalty = sum(Royalty)) ## Se debe de agregar los canones por el valor de la tierra
-# 
-# Ingresos.poliducto <- Ingresos.poliducto %>%
-#   gather(Año, Valor, -Sistema,-Elemento,-Categoria.Ingresos ) %>%
-#   mutate(Año = as.factor(Año))
-# 
-# Ingresos.E11 <- Ingresos.poliducto %>%
-#   group_by(Año) %>%
-#   summarise(Ingresos.Brutos = sum(Valor))
-# # 
-# # tmp <- split(Ingresos,Ingresos$Elemento)
-# # 
-# # tmp$
-  
+costos.sistema11 <- segmentar_costos(type="SF")
+
+
+# IVA e ISR ---------------------------------------------------------------------
+
+map2(ingresos_sistema11,inversiones.sistema11,left_join) %>%
+  map2(costos.sistema11, left_join)
