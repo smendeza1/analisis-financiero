@@ -290,35 +290,54 @@ segmentar_costos <- function(df = Costos, type) {
            map(gather, Año, Valor, -c(Sistema:Componente)) %>%
            map(mutate, Año = as.factor(Año)) %>%
            map(group_by, Año) %>%
-           map(summarise, Costos = sum(Valor)),
+           map(summarise, Costos = sum(Valor)) %>% 
+           map(mutate, IVAxCobrar = Costos*0.12),
          ST = df %>% 
            mutate(Sistema = as.factor(Sistema)) %>%
            split(df$Sistema) %>%
            map(gather, Año, Valor, -c(Sistema:Componente)) %>%
            map(mutate, Año = as.factor(Año)) %>%
            map(group_by, Año, Componente) %>%
-           map(summarise, Inversion = sum(Valor)),
+           map(summarise, Inversion = sum(Valor))%>% 
+           map(mutate, IVAxCobrar = Costos*0.12),
          EF = df %>% 
            mutate(Elemento = as.factor(Elemento)) %>%
            split(df$Elemento) %>%
            map(gather, Año, Valor, -c(Sistema:Componente)) %>%
            map(mutate, Año = as.factor(Año)) %>%
            map(group_by, Año) %>%
-           map(summarise, Inversion = sum(Valor)),
+           map(summarise, Inversion = sum(Valor))%>% 
+           map(mutate, IVAxCobrar = Costos*0.12),
          ET = df %>% 
            mutate(Elemento = as.factor(Elemento)) %>%
            split(df$Elemento) %>%
            map(gather, Año, Valor, -c(Sistema:Componente)) %>%
            map(mutate, Año = as.factor(Año)) %>%
            map(group_by, Año, Componente) %>%
-           map(summarise, Inversion = sum(Valor)))
+           map(summarise, Inversion = sum(Valor))%>% 
+           map(mutate, IVAxCobrar = Costos*0.12))
   
 }
 
-costos.sistema11 <- segmentar_costos(type="SF")
+costos.sistema11 <- segmentar_costos(type = "SF")
 
 
 # IVA e ISR ---------------------------------------------------------------------
 
-map2(ingresos_sistema11,inversiones.sistema11,left_join) %>%
-  map2(costos.sistema11, left_join)
+Impuestos11 <- map2(ingresos_sistema11,inversiones.sistema11,left_join) %>%
+  map2(costos.sistema11, left_join, by = "Año") %>%
+  map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y) %>%
+  map(select, -Inversion, -Royalty, -Ingresos.Brutos, -IVAxCobrar.x, -IVAxCobrar.y, -Costos ) %>% 
+  map(mutate, IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
+              IVA.aux2 = IVAxCobrar - IVAxPagar,
+              IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) %>% 
+  map(select, -contains("aux"))
+
+
+
+# Financiamiento ----------------------------------------------------------
+
+inversiones.sistema11
+
+
+
