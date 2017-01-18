@@ -16,7 +16,8 @@ require(scales)
 
 # ##Datos para realizar modificaciones a la función
 n                 = 30
-r                 = 0.08 ## Tasa financiamiento
+r                 = 0.05 ## Tasa financiamiento
+tasa.descuento    = 0.08
 pct.financiado    = 0.6
 tipo.demanda      = "min"
 isr               = 0.07
@@ -508,7 +509,7 @@ valorizacion.sistema11 <- ingresos.sistema11 %>%
                                  Inversion = 0,
                                  Pago = 0,
                                  IVA.Neto = 0)) %>%
-  map(calcular_fen, r = r, horizonte = 2062)
+  map(calcular_fen, r = tasa.descuento, horizonte = 2062)
 
 valorizacion.elemento11 <- ingresos.elemento11 %>%
   map2(costos.elemento11, full_join) %>%
@@ -526,7 +527,7 @@ valorizacion.elemento11 <- ingresos.elemento11 %>%
                                  Inversion = 0,
                                  Pago = 0,
                                  IVA.Neto = 0)) %>%
-  map(calcular_fen, r = r, horizonte = 2062)
+  map(calcular_fen, r = tasa.descuento, horizonte = 2062)
 
 valor.elemento <- bind_rows(valorizacion.elemento11, .id = "Elemento")
 valor.sistema <- bind_rows(valorizacion.sistema11, .id = "Sistema")
@@ -538,3 +539,4 @@ vpns.multimodal <- valor.elemento %>%
 valor.sistema$valor.presente %>%  sum()
 
 valor.sistema
+valor.elemento
