@@ -17,8 +17,6 @@ require(scales)
 # ##Datos para realizar modificaciones a la función
 n                 = 30
 r                 = 0.08 ## Tasa financiamiento
-r2                = 0.25 ## Regimen sobre utilidades
-tasa.descuento    = 0.08
 pct.financiado    = 0.6
 tipo.demanda      = "min"
 isr               = 0.07
@@ -93,19 +91,20 @@ Ingresos <- left_join(Tarifas, Demanda) %>%
 
 if (tipo.demanda == "min") {
   Ingresos <- Ingresos %>%
-    mutate(Ingresos.Brutos = if_else(Elemento != "Ferrocarril", 
-                                     Tarifa.dols*pct.mercado*Ramp.Up*MIN*2, 
-                                     Tarifa.dols*pct.mercado*Ramp.Up*MIN),
-           Mercado = pct.mercado*Ramp.Up*MIN,
+    mutate( Mercado = round(pct.mercado*Ramp.Up*MIN,0),
+            Ingresos.Brutos = if_else(Elemento != "Ferrocarril", 
+                                     Tarifa.dols*Mercado*2, 
+                                     Tarifa.dols*Mercado),
            Royalty = Ingresos.Brutos*pct.royalty,
            IVAxPagar = Ingresos.Brutos*0.12) 
   
 }else{
   Ingresos <- Ingresos %>%
-    mutate(Ingresos.Brutos = if_else(Elemento != "Ferrocarril",
-                                     Tarifa.dols*pct.mercado*Ramp.Up*MAX*2,
-                                     Tarifa.dols*pct.mercado*Ramp.Up*MAX),
-           Mercado = pct.mercado*Ramp.Up*MAX,
+    mutate( Mercado = round(pct.mercado*Ramp.Up*MAX,0),
+           Ingresos.Brutos = if_else(Elemento != "Ferrocarril",
+                                     Tarifa.dols*Mercado*2,
+                                     Tarifa.dols*Mercado),
+
            Royalty = Ingresos.Brutos*pct.royalty,
            IVAxPagar = Ingresos.Brutos*0.12) 
   
@@ -537,3 +536,5 @@ vpns.multimodal <- valor.elemento %>%
   select(valor.presente) %>% sum()
 
 valor.sistema$valor.presente %>%  sum()
+
+valor.sistema
