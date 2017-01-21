@@ -1,9 +1,3 @@
-# # Información utilizada por la función para poder funcionar
-Demanda <- read_excel("app/Datos/Intermodal/Ingresos.xlsx", sheet = "Demanda")
-Tarifas <- read_excel("app/Datos/Intermodal/Ingresos.xlsx", sheet = "Tarifas")
-Costos <- read_excel("app/Datos/Intermodal/Costos e Inversiones.xlsx", sheet = "Costos")
-Inversiones <- read_excel("app/Datos/Intermodal/Costos e Inversiones.xlsx", sheet = "Inversiones")
-Ingresos.poliducto <- read_excel("app/Datos/Intermodal/Ingresos.xlsx", sheet = "Ingresos")
 
 require(shiny)
 require(tidyverse)
@@ -11,7 +5,13 @@ require(readxl)
 require(stringr)
 require(FinCal)
 require(scales)
-
+require(purrr)
+# # Información utilizada por la función para poder funcionar
+Demanda <- read_excel("app/Datos/Intermodal/Ingresos.xlsx", sheet = "Demanda")
+Tarifas <- read_excel("app/Datos/Intermodal/Ingresos.xlsx", sheet = "Tarifas")
+Costos <- read_excel("app/Datos/Intermodal/Costos e Inversiones.xlsx", sheet = "Costos")
+Inversiones <- read_excel("app/Datos/Intermodal/Costos e Inversiones.xlsx", sheet = "Inversiones")
+Ingresos.poliducto <- read_excel("app/Datos/Intermodal/Ingresos.xlsx", sheet = "Ingresos")
 
 
 # ##Datos para realizar modificaciones a la función
@@ -137,15 +137,15 @@ segmentar_ingreso <- function(df = Ingresos, type = "Sistema"){
   switch(type,
   Sistema = Ingresos %>%
     split(Ingresos$Sistema) %>%
-    map(group_by, Año) %>%
     map(select, -Elemento, -Sistema) %>%
+    map(group_by, Año) %>%
     map(summarise_all, sum) %>% 
     map(mutate, ISR = Ingresos.Brutos*isr),
   Elemento = Ingresos %>%
     split(Ingresos$Elemento) %>%
-    map(group_by, Año) %>%
     map(select, -Elemento, -Sistema) %>%
-    map(summarise_all, sum)%>% 
+    map(group_by, Año) %>%
+    map(summarise_all, sum) %>% 
     map(mutate, ISR = Ingresos.Brutos*isr))
   }
   
@@ -489,7 +489,7 @@ calcular_fen <- function(df,r,horizonte = 2062){
   tir <- irr(df$FEN)
   
   res <- data.frame(flujo, valor.presente, tir)
-  res
+  res <- list(res,df)
 }
 
 
