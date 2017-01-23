@@ -26,6 +26,7 @@ horizonte         = 2080
 regimen.fiscal    = FALSE ## en donde FALSE indica regimen sobre ingresos
 split.puertos     = 0.5
 pct.royalty       = 0.05
+pct.gastos.comercializacion = 0.025
 
 
 # Leyendas data frame -----------------------------------------------------
@@ -93,6 +94,9 @@ Ingresos <- left_join(Tarifas, Demanda) %>%
 if (tipo.demanda == "min") {
   Ingresos <- Ingresos %>%
     mutate( Mercado = round(pct.mercado*Ramp.Up*MIN,0),
+            Mercado = if_else(Elemento == "Ferrocarril", 
+                              lag(Mercado,1) + lag(Mercado,2),
+                              Mercado),
             Ingresos.Brutos = if_else(Elemento != "Ferrocarril", 
                                      Tarifa.dols*Mercado*2, 
                                      Tarifa.dols*Mercado),
@@ -102,10 +106,12 @@ if (tipo.demanda == "min") {
 }else{
   Ingresos <- Ingresos %>%
     mutate( Mercado = round(pct.mercado*Ramp.Up*MAX,0),
+            Mercado = if_else(Elemento == "Ferrocarril", 
+                              lag(Mercado,1) + lag(Mercado,2),
+                              Mercado),
            Ingresos.Brutos = if_else(Elemento != "Ferrocarril",
                                      Tarifa.dols*Mercado*2,
                                      Tarifa.dols*Mercado),
-
            Royalty = Ingresos.Brutos*pct.royalty,
            IVAxPagar = Ingresos.Brutos*0.12) 
   
@@ -123,7 +129,7 @@ Ingresos <- Ingresos %>%
           Sistema = as.factor(Sistema),
           Elemento = as.factor(Elemento),
           Royalty = Ingresos.Brutos*pct.royalty,
-          IVAxPagar = Ingresos.Brutos*0.12)
+          IVAxPagar = Ingresos.Brutos*0.12) 
 
 Ingresos <- Ingresos %>% 
   bind_rows(Ingresos.poliducto) %>%
@@ -322,28 +328,6 @@ costos.sistema11 <- segmentar_costos(type = "SF")
 costos.sistema10 <- segmentar_costos(type = "ST")
 costos.elemento11 <- segmentar_costos(type = "EF")
 costos.elemento10 <- segmentar_costos(type = "ET")
-# IVA e ISR ---------------------------------------------------------------------
-
-Impuestos11 <- map2(ingresos.sistema11,inversiones.sistema11,left_join) %>%
-  map2(costos.sistema11, left_join, by = "Año") %>%
-  map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y) %>%
-  map(select, -Inversion, -Royalty, -Ingresos.Brutos, -IVAxCobrar.x, -IVAxCobrar.y, -Costos ) %>% 
-  map(mutate, IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
-              IVA.aux2 = IVAxCobrar - IVAxPagar,
-              IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) %>% 
-  map(select, -contains("aux"))
-
-
-
-
-impuestos.elemento11 <- map2(ingresos.elemento11,inversiones.elemento11,left_join) %>%
-  map2(costos.elemento11, left_join, by = "Año") %>%
-  map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y) %>%
-  map(select, -Inversion, -Royalty, -Ingresos.Brutos, -IVAxCobrar.x, -IVAxCobrar.y, -Costos ) %>% 
-  map(mutate, IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
-      IVA.aux2 = IVAxCobrar - IVAxPagar,
-      IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) %>% 
-  map(select, -contains("aux"))
 
 
 # Financiamiento ----------------------------------------------------------
@@ -469,27 +453,74 @@ financiamiento.elemento11 <- inversiones.elemento11 %>%
   map2(ingresos.elemento11, left_join) %>% 
   map(amortizacion,pct.financiado = pct.financiado, n = n, r = r)
 
+# IVA e ISR ---------------------------------------------------------------------
+
+Impuestos.sistema11 <- map2(ingresos.sistema11,inversiones.sistema11,left_join) %>%
+  map2(costos.sistema11, left_join, by = "Año") %>%
+  map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y) %>%
+  map(select, -Inversion, -Royalty, -Ingresos.Brutos, -IVAxCobrar.x, -IVAxCobrar.y, -Costos ) %>% 
+  map(mutate, IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
+      IVA.aux2 = IVAxCobrar - IVAxPagar,
+      IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) 
+
+
+
+
+impuestos.elemento11 <- map2(ingresos.elemento11,inversiones.elemento11,left_join) %>%
+  map2(costos.elemento11, left_join, by = "Año") %>%
+  map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y) %>%
+  map(select, -Inversion, -Royalty, -Ingresos.Brutos, -IVAxCobrar.x, -IVAxCobrar.y, -Costos ) %>% 
+  map(mutate, IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
+      IVA.aux2 = IVAxCobrar - IVAxPagar,
+      IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) %>% 
+  map(select, -contains("aux"))
+
+
 # Valorizacion ------------------------------------------------------------
 
-calcular_fen <- function(df,r,horizonte = 2062){
+df <- ingresos.sistema11 %>%
+  map2(costos.sistema11, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(inversiones.sistema11, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(financiamiento.sistema11, full_join) %>%
+  map(select, -Saldo, -Intereses, -Amortizacion) %>%
+  map2(Impuestos11, full_join) %>%
+  map(select, -contains("IVAx")) %>%
+  map(replace_na, replace = list(Ingresos.Brutos = 0,
+                                 Royalty = 0,
+                                 ISR = 0,
+                                 Costos = 0,
+                                 Inversion = 0,
+                                 Pago = 0,
+                                 IVA.Neto = 0))
+
+df <- df $Multimodal
+
+calcular_fen <- function(df,r,horizonte = 2062, res = 1, regimen.fiscal = FALSE){
   
+  df$regimen.fiscal <- regimen.fiscal
   df <-  df %>% 
     mutate(IVA.Neto = if_else(IVA.Neto > 0,0,IVA.Neto),
+           ISR2 = if_else(regimen.fiscal == FALSE, ISR, (Ingresos.Brutos - Costos)*isr2),
            FEN      =  Ingresos.Brutos
-           - ISR
+           - ISR2
            - Costos
            - Inversion
-           - Pago
+           # - Pago
            + IVA.Neto,
            Año = as.numeric(Año)) %>% 
     filter(Año <= horizonte)
   
   flujo <- sum(df$FEN)
-  valor.presente <- npv(r = 0.08, cf = df$FEN)
+  valor.presente <- npv(r = r, cf = df$FEN)
   tir <- irr(df$FEN)
   
+  if (res == 1) {
   res <- data.frame(flujo, valor.presente, tir)
-  res <- list(res,df)
+  } else {
+  df
+}
 }
 
 
@@ -509,34 +540,29 @@ valorizacion.sistema11 <- ingresos.sistema11 %>%
                                  Inversion = 0,
                                  Pago = 0,
                                  IVA.Neto = 0)) %>%
-  map(calcular_fen, r = tasa.descuento, horizonte = 2062)
+  map(calcular_fen, r = 0.08, horizonte = 2062, res = 1, regimen.fiscal = TRUE)
 
-valorizacion.elemento11 <- ingresos.elemento11 %>%
-  map2(costos.elemento11, full_join) %>%
-  map(select, -contains("IVA")) %>% 
-  map2(inversiones.elemento11, full_join) %>% 
-  map(select, -contains("IVA")) %>% 
-  map2(financiamiento.elemento11, full_join) %>%
-  map(select, -Saldo, -Intereses, -Amortizacion) %>% 
-  map2(impuestos.elemento11, full_join) %>% 
-  map(select, -contains("IVAx")) %>% 
-  map(replace_na, replace = list(Ingresos.Brutos = 0,
-                                 Royalty = 0,
-                                 ISR = 0,
-                                 Costos = 0,
-                                 Inversion = 0,
-                                 Pago = 0,
-                                 IVA.Neto = 0)) %>%
-  map(calcular_fen, r = tasa.descuento, horizonte = 2062)
-
-valor.elemento <- bind_rows(valorizacion.elemento11, .id = "Elemento")
+# valorizacion.elemento11 <- ingresos.elemento11 %>%
+#   map2(costos.elemento11, full_join) %>%
+#   map(select, -contains("IVA")) %>%
+#   map2(inversiones.elemento11, full_join) %>%
+#   map(select, -contains("IVA")) %>%
+#   map2(financiamiento.elemento11, full_join) %>%
+#   map(select, -Saldo, -Intereses, -Amortizacion) %>%
+#   map2(impuestos.elemento11, full_join) %>%
+#   map(select, -contains("IVAx")) %>%
+#   map(replace_na, replace = list(Ingresos.Brutos = 0,
+#                                  Royalty = 0,
+#                                  ISR = 0,
+#                                  Costos = 0,
+#                                  Inversion = 0,
+#                                  Pago = 0,
+#                                  IVA.Neto = 0)) %>%
+#   map(calcular_fen, r = tasa.descuento, horizonte = 2062, res = 2, regimen.fiscal = TRUE)
+# 
+# valor.elemento <- bind_rows(valorizacion.elemento11, .id = "Elemento")
 valor.sistema <- bind_rows(valorizacion.sistema11, .id = "Sistema")
-
-vpns.multimodal <- valor.elemento %>% 
-  filter(Elemento != "Poliductos") %>%
-  select(valor.presente) %>% sum()
-
-valor.sistema$valor.presente %>%  sum()
-
-valor.sistema
+valor.sistema 
 valor.elemento
+
+valorizacion.sistema11$Multimodal %>% View()
