@@ -27,6 +27,7 @@ regimen.fiscal    = FALSE ## en donde FALSE indica regimen sobre ingresos
 split.puertos     = 0.5
 pct.royalty       = 0.05
 pct.gastos.comercializacion = 0.025
+tasa.retorno.manual = FALSE
 
 
 # Leyendas data frame -----------------------------------------------------
@@ -208,7 +209,8 @@ inversiones.elemento10 <- segmentar_inversion(Inversiones, type = "ET")
 
 
 ## Funcion que sirve para calcular los anticipos y las anualidades de cada canon
-## en donde canon puede referirse al valor de renta de infraestructura o concesión del corredor
+## en donde el primer canon se refiere al valor de renta de infraestructura  y
+## el segundo canon al valor de la concesión del corredor
 
 canon.infraestructura <- function(df, 
                                   tasa.descuento.ice = 0.04, 
@@ -256,12 +258,12 @@ canon.concesion <- function(valor = 5500000,
                pv = valor,
                fv = 0)*n.canon*pct.pago.anticipado
 
-  valor <- valor *(1-pct.pago.anticipado)
+  valor <- valor *(1 - pct.pago.anticipado)
   pago <- -pmt(r = tasa.descuento.ice,
                n = n.canon,
                pv = valor,
                fv = 0)
-  res <- list(pago = pago, pago.anticipado = pago.anticipado)
+  res <- data.frame(pago = pago, pago.anticipado = pago.anticipado)
   res
 }
 
@@ -478,7 +480,76 @@ impuestos.elemento11 <- map2(ingresos.elemento11,inversiones.elemento11,left_joi
 
 # Valorizacion ------------------------------------------------------------
 
-df <- ingresos.sistema11 %>%
+### Calculo de la tasa de retorno esperada
+
+
+  if (tasa.retorno.manual == TRUE) {
+    expected.return <- tasa.retorno.input
+  } else{
+    require(rvest)
+    url <- "http://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/totalbeta.html"
+    url2 <- "http://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html"
+    
+    safe_read <- safely(read_html)
+    prueba <- safe_read(url)
+    
+    
+      if (is_null(prueba$result)) {
+      betas <- readRDS("app/Datos/Intermodal/betas2017-01-25.rds")
+      tasas <- readRDS("app/Datos/Intermodal/tasas2017-01-25.rds")
+      
+    } else{
+      betas <- read_html(url) %>% 
+        html_nodes(xpath = "/html/body/table") %>% 
+        html_table()
+      
+      fecha.consulta <- Sys.Date()
+      flname <- paste0("app/Datos/Intermodal/betas",fecha.consulta,".rds")
+      saveRDS(object = betas ,file = flname)
+      
+      tasas <- read_html(url2) %>% 
+        html_table()
+      
+      flname <- paste0("app/Datos/Intermodal/tasas",fecha.consulta,".rds")
+      saveRDS(object = tasas ,file = flname)
+    }
+    
+    
+    betas <- as.data.frame(betas)
+    names(betas) <- betas[1,]
+    betas <- betas[c(91,92),c(1,3)]
+    beta <- betas$`Average Unlevered Beta` %>% 
+      as.numeric() %>% 
+      mean()
+    
+    tasas <- as.data.frame(tasas)
+    names(tasas) <- tasas[2,]
+    
+    tasas  <- tasas[3:nrow(tasas),] 
+    tasas.promedio <- tail(tasas,9) %>% head(4)
+    nombres <- c("periodo","SP500","3month.bill","10year.bond")
+    tasas <- tasas.promedio[1:4] 
+    names(tasas) <- nombres
+    tasas <- tasas[2:nrow(tasas),]
+    
+    rm <- tasas[3,2]
+    rf <- tasas[3,4]
+    rm <- rm %>% str_replace("%","")
+    rm <- as.numeric(rm)/100
+    
+    rf <- rf %>% str_replace("%","")
+    rf <- as.numeric(rf)/100
+    expected.return <- rf + beta*(rm - rf)
+    financial.data <- data.frame(expected.return, rf, rm,beta)
+    financial.data
+  }
+
+expected.return <- financial.data[["expected.return"]]
+
+### Creación de data frames que sirven de input para el calculo del VP base del 
+### proyecto y VP del financiamiento en las modalidades: 
+### Sistema completo, portipo de sistema y por elemento del sistema
+df.sistema11 <- ingresos.sistema11 %>%
   map2(costos.sistema11, full_join) %>%
   map(select, -contains("IVA")) %>%
   map2(inversiones.sistema11, full_join) %>%
@@ -496,8 +567,30 @@ df <- ingresos.sistema11 %>%
                                  IVA.Neto = 0,
                                  Intereses = 0))
 
-df <- df$Multimodal
+df.sistema.completo11 <- df.sistema11 %>% 
+  bind_rows() %>% 
+  group_by(Año) %>% 
+  summarise_each("sum") 
 
+df.elemento11 <- ingresos.elemento11 %>%
+  map2(costos.elemento11, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(inversiones.elemento11, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(financiamiento.elemento11, full_join) %>%
+  map(select, -Saldo, -Amortizacion) %>%
+  map2(impuestos.elemento11, full_join) %>%
+  map(select, -contains("IVAx")) %>%
+  map(replace_na, replace = list(Ingresos.Brutos = 0,
+                                 Royalty = 0,
+                                 ISR = 0,
+                                 Costos = 0,
+                                 Inversion = 0,
+                                 Pago = 0,
+                                 IVA.Neto = 0,
+                                 Intereses = 0))
+
+### Funciones que calculan vpn base y de financiamiento respectivamente
 calcular_fen <- function(df,r,horizonte = 2062, res = 1, regimen.fiscal = FALSE){
   
   df$regimen.fiscal <- regimen.fiscal
@@ -513,17 +606,16 @@ calcular_fen <- function(df,r,horizonte = 2062, res = 1, regimen.fiscal = FALSE)
            Año = as.numeric(Año)) %>% 
     filter(Año <= horizonte)
   
-  flujo <- sum(df$FEN)
-  valor.presente <- npv(r = r, cf = df$FEN)
+  flujo.base <- sum(df$FEN)
+  vp.base <- npv(r = r, cf = df$FEN)
   tir <- irr(df$FEN)
   
   if (res == 1) {
-  res <- data.frame(flujo, valor.presente, tir)
+  res <- data.frame(flujo.base, vp.base, tir)
   } else {
   df
 }
 }
-
 calcular_vpnf <- function(df,r,horizonte = 2062, res = 1, regimen.fiscal = FALSE,
                           pct.financiado = pct.financiado){
   
@@ -538,105 +630,42 @@ calcular_vpnf <- function(df,r,horizonte = 2062, res = 1, regimen.fiscal = FALSE
     filter(Año <= horizonte) %>% 
     arrange(Año)
   
-  flujo <- sum(df$FEN)
-  valor.presente <- npv(r = r, cf = df$FEN)
-  tir <- irr(df$FEN)
+  flujo.fin <- sum(df$FEN)
+  vp.fin <- npv(r = r, cf = df$FEN)
   
   if (res == 1) {
-    res <- data.frame(flujo, valor.presente, tir)
+    res <- data.frame(flujo.fin, vp.fin)
   } else {
     df
   }
 }
 
-valorizacion.sistema11 <- ingresos.sistema11 %>%
-  map2(costos.sistema11, full_join) %>%
-  map(select, -contains("IVA")) %>% 
-  map2(inversiones.sistema11, full_join) %>% 
-  map(select, -contains("IVA")) %>% 
-  map2(financiamiento.sistema11, full_join) %>%
-  map(select, -Saldo, -Intereses, -Amortizacion) %>% 
-  map2(Impuestos11, full_join) %>% 
-  map(select, -contains("IVAx")) %>% 
-  map(replace_na, replace = list(Ingresos.Brutos = 0,
-                                 Royalty = 0,
-                                 ISR = 0,
-                                 Costos = 0,
-                                 Inversion = 0,
-                                 Pago = 0,
-                                 IVA.Neto = 0)) %>%
-  map(calcular_fen, r = (0.05 + 0.745*(0.08 - 0.05)), horizonte = 2062, res = 1, regimen.fiscal = TRUE)
+### Calculo de vp base para cada modalidad
+valor.sistema.completo <- calcular_fen(df.sistema.completo11, r = expected.return, horizonte = 2062, res = 1, regimen.fiscal = TRUE )
+valor.sistema11 <- map(df.sistema11, calcular_fen,  r = expected.return, horizonte = 2062, res = 1, regimen.fiscal = TRUE)
+valor.elemento11 <- map(df.elemento11, calcular_fen,  r = expected.return, horizonte = 2062, res = 1, regimen.fiscal = TRUE)
+valor.sistema11 <- bind_rows(valor.sistema11, .id = "Sistema")
+valor.elemento11 <- bind_rows(valor.elemento11, .id = "Elemento")
 
-valor.completo <- ingresos.sistema11 %>%
-  map2(costos.sistema11, full_join) %>%
-  map(select, -contains("IVA")) %>% 
-  map2(inversiones.sistema11, full_join) %>% 
-  map(select, -contains("IVA")) %>% 
-  map2(financiamiento.sistema11, full_join) %>%
-  map(select, -Saldo, -Intereses, -Amortizacion) %>% 
-  map2(Impuestos11, full_join) %>% 
-  map(select, -contains("IVAx")) %>% 
-  map(replace_na, replace = list(Ingresos.Brutos = 0,
-                                 Royalty = 0,
-                                 ISR = 0,
-                                 Costos = 0,
-                                 Inversion = 0,
-                                 Pago = 0,
-                                 IVA.Neto = 0)) %>% 
-  bind_rows()
+### Calculo de vp del financiamiento para cada modalidad
+valor.sistema.completo.fin <- calcular_vpnf(df.sistema.completo11, r = expected.return, horizonte = 2062, res = 1, regimen.fiscal = TRUE, pct.financiado = pct.financiado)
+valor.sistema11.fin <- map(df.sistema11, calcular_vpnf,  r = expected.return, horizonte = 2062, res = 1, regimen.fiscal = TRUE, pct.financiado = pct.financiado)
+valor.elemento11.fin <- map(df.elemento11, calcular_vpnf,  r = expected.return, horizonte = 2062, res = 1, regimen.fiscal = TRUE, pct.financiado = pct.financiado)
+valor.sistema11.fin <- bind_rows(valor.sistema11.fin, .id = "Sistema")
+valor.elemento11.fin <- bind_rows(valor.elemento11.fin, .id = "Elemento")
+
+### DF para cada variedad
+valor.completo <- bind_cols(list(valor.sistema.completo,
+                                 valor.sistema.completo.fin)) %>% 
+                  mutate(vp.total = vp.base + vp.fin)
+
+valor.sistema <- left_join(valor.sistema11, valor.sistema11.fin) %>% 
+                 mutate(vp.total = vp.base + vp.fin)
+
+valor.elemento <- left_join(valor.elemento11, valor.elemento11.fin) %>% 
+  mutate(vp.total = vp.base + vp.fin)
 
 
-valor.total <- valor.completo %>% 
-  group_by(Año) %>% 
-  summarise_each("sum") %>% 
-  calcular_fen(r = (0.05 + 0.745*(0.08 - 0.05)), horizonte = 2062, res = 1, regimen.fiscal = TRUE)
-
-valor.total
-
-
-valor.deuda <- ingresos.sistema11 %>%
-  map2(costos.sistema11, full_join) %>%
-  map(select, -contains("IVA")) %>%
-  map2(inversiones.sistema11, full_join) %>%
-  map(select, -contains("IVA")) %>%
-  map2(financiamiento.sistema11, full_join) %>%
-  map(select, -Saldo, -Amortizacion) %>%
-  map2(Impuestos11, full_join) %>%
-  map(select, -contains("IVAx")) %>%
-  map(replace_na, replace = list(Ingresos.Brutos = 0,
-                                 Royalty = 0,
-                                 ISR = 0,
-                                 Costos = 0,
-                                 Inversion = 0,
-                                 Pago = 0,
-                                 IVA.Neto = 0,
-                                 Intereses = 0)) %>% 
-  map(calcular_vpnf, r =r ,horizonte = 2062, res = 1, regimen.fiscal = FALSE,
-      pct.financiado = 0.9) %>% 
-  bind_rows(.id = "Sistema")
-
-
-# valorizacion.elemento11 <- ingresos.elemento11 %>%
-#   map2(costos.elemento11, full_join) %>%
-#   map(select, -contains("IVA")) %>%
-#   map2(inversiones.elemento11, full_join) %>%
-#   map(select, -contains("IVA")) %>%
-#   map2(financiamiento.elemento11, full_join) %>%
-#   map(select, -Saldo, -Intereses, -Amortizacion) %>%
-#   map2(impuestos.elemento11, full_join) %>%
-#   map(select, -contains("IVAx")) %>%
-#   map(replace_na, replace = list(Ingresos.Brutos = 0,
-#                                  Royalty = 0,
-#                                  ISR = 0,
-#                                  Costos = 0,
-#                                  Inversion = 0,
-#                                  Pago = 0,
-#                                  IVA.Neto = 0)) %>%
-#   map(calcular_fen, r = tasa.descuento, horizonte = 2062, res = 2, regimen.fiscal = TRUE)
-# 
-# valor.elemento <- bind_rows(valorizacion.elemento11, .id = "Elemento")
-valor.sistema <- bind_rows(valorizacion.sistema11, .id = "Sistema")
-valor.sistema 
+valor.completo
+valor.sistema
 valor.elemento
-
-valorizacion.sistema11$Multimodal %>% View()
