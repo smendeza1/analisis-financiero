@@ -484,7 +484,7 @@ df <- ingresos.sistema11 %>%
   map2(inversiones.sistema11, full_join) %>%
   map(select, -contains("IVA")) %>%
   map2(financiamiento.sistema11, full_join) %>%
-  map(select, -Saldo, -Intereses, -Amortizacion) %>%
+  map(select, -Saldo, -Amortizacion) %>%
   map2(Impuestos11, full_join) %>%
   map(select, -contains("IVAx")) %>%
   map(replace_na, replace = list(Ingresos.Brutos = 0,
@@ -493,9 +493,10 @@ df <- ingresos.sistema11 %>%
                                  Costos = 0,
                                  Inversion = 0,
                                  Pago = 0,
-                                 IVA.Neto = 0))
+                                 IVA.Neto = 0,
+                                 Intereses = 0))
 
-df <- df $Multimodal
+df <- df$Multimodal
 
 calcular_fen <- function(df,r,horizonte = 2062, res = 1, regimen.fiscal = FALSE){
   
@@ -523,6 +524,30 @@ calcular_fen <- function(df,r,horizonte = 2062, res = 1, regimen.fiscal = FALSE)
 }
 }
 
+calcular_vpnf <- function(df,r,horizonte = 2062, res = 1, regimen.fiscal = FALSE,
+                          pct.financiado = pct.financiado){
+  
+  df$regimen.fiscal <- regimen.fiscal
+  
+  
+  df <-  df %>% 
+    mutate(FEN      =  Inversion*pct.financiado
+           - Pago
+           + Intereses*isr2,
+           Año = as.numeric(Año)) %>% 
+    filter(Año <= horizonte) %>% 
+    arrange(Año)
+  
+  flujo <- sum(df$FEN)
+  valor.presente <- npv(r = r, cf = df$FEN)
+  tir <- irr(df$FEN)
+  
+  if (res == 1) {
+    res <- data.frame(flujo, valor.presente, tir)
+  } else {
+    df
+  }
+}
 
 valorizacion.sistema11 <- ingresos.sistema11 %>%
   map2(costos.sistema11, full_join) %>%
@@ -540,7 +565,55 @@ valorizacion.sistema11 <- ingresos.sistema11 %>%
                                  Inversion = 0,
                                  Pago = 0,
                                  IVA.Neto = 0)) %>%
-  map(calcular_fen, r = 0.08, horizonte = 2062, res = 1, regimen.fiscal = TRUE)
+  map(calcular_fen, r = (0.05 + 0.725*(0.08 - 0.05)), horizonte = 2062, res = 1, regimen.fiscal = TRUE)
+
+valor.completo <- ingresos.sistema11 %>%
+  map2(costos.sistema11, full_join) %>%
+  map(select, -contains("IVA")) %>% 
+  map2(inversiones.sistema11, full_join) %>% 
+  map(select, -contains("IVA")) %>% 
+  map2(financiamiento.sistema11, full_join) %>%
+  map(select, -Saldo, -Intereses, -Amortizacion) %>% 
+  map2(Impuestos11, full_join) %>% 
+  map(select, -contains("IVAx")) %>% 
+  map(replace_na, replace = list(Ingresos.Brutos = 0,
+                                 Royalty = 0,
+                                 ISR = 0,
+                                 Costos = 0,
+                                 Inversion = 0,
+                                 Pago = 0,
+                                 IVA.Neto = 0)) %>% 
+  bind_rows()
+
+
+valor.total <- valor.completo %>% 
+  group_by(Año) %>% 
+  summarise_each("sum") %>% 
+  calcular_fen(r = (0.05 + 0.725*(0.08 - 0.05)), horizonte = 2062, res = 1, regimen.fiscal = TRUE)
+
+valor.total
+
+
+valor.deuda <- ingresos.sistema11 %>%
+  map2(costos.sistema11, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(inversiones.sistema11, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(financiamiento.sistema11, full_join) %>%
+  map(select, -Saldo, -Amortizacion) %>%
+  map2(Impuestos11, full_join) %>%
+  map(select, -contains("IVAx")) %>%
+  map(replace_na, replace = list(Ingresos.Brutos = 0,
+                                 Royalty = 0,
+                                 ISR = 0,
+                                 Costos = 0,
+                                 Inversion = 0,
+                                 Pago = 0,
+                                 IVA.Neto = 0,
+                                 Intereses = 0)) %>% 
+  map(calcular_vpnf, r =r ,horizonte = 2062, res = 1, regimen.fiscal = FALSE,
+      pct.financiado = pct.financiado)
+
 
 # valorizacion.elemento11 <- ingresos.elemento11 %>%
 #   map2(costos.elemento11, full_join) %>%
