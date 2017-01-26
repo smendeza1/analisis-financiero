@@ -565,7 +565,7 @@ valorizacion.sistema11 <- ingresos.sistema11 %>%
                                  Inversion = 0,
                                  Pago = 0,
                                  IVA.Neto = 0)) %>%
-  map(calcular_fen, r = (0.05 + 0.725*(0.08 - 0.05)), horizonte = 2062, res = 1, regimen.fiscal = TRUE)
+  map(calcular_fen, r = (0.05 + 0.745*(0.08 - 0.05)), horizonte = 2062, res = 1, regimen.fiscal = TRUE)
 
 valor.completo <- ingresos.sistema11 %>%
   map2(costos.sistema11, full_join) %>%
@@ -589,7 +589,7 @@ valor.completo <- ingresos.sistema11 %>%
 valor.total <- valor.completo %>% 
   group_by(Año) %>% 
   summarise_each("sum") %>% 
-  calcular_fen(r = (0.05 + 0.725*(0.08 - 0.05)), horizonte = 2062, res = 1, regimen.fiscal = TRUE)
+  calcular_fen(r = (0.05 + 0.745*(0.08 - 0.05)), horizonte = 2062, res = 1, regimen.fiscal = TRUE)
 
 valor.total
 
@@ -612,7 +612,8 @@ valor.deuda <- ingresos.sistema11 %>%
                                  IVA.Neto = 0,
                                  Intereses = 0)) %>% 
   map(calcular_vpnf, r =r ,horizonte = 2062, res = 1, regimen.fiscal = FALSE,
-      pct.financiado = pct.financiado)
+      pct.financiado = 0.9) %>% 
+  bind_rows(.id = "Sistema")
 
 
 # valorizacion.elemento11 <- ingresos.elemento11 %>%
