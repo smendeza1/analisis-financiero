@@ -15,19 +15,22 @@ Ingresos.poliducto <- read_excel("app/Datos/Intermodal/Ingresos.xlsx", sheet = "
 
 
 # ##Datos para realizar modificaciones a la función
-n                 = 30
+n                 = 30 # Tiempo financiamiento
+n.concesion.multi = 50
+n.concesion.poli  = 30
 r                 = 0.05 ## Tasa financiamiento
+r.ice             = 0.04 ## Tasa Canon Concesión
+tasa.retorno.manual = FALSE
 tasa.descuento    = 0.08
 pct.financiado    = 0.6
 tipo.demanda      = "min"
 isr               = 0.07
 isr2              = 0.25
-horizonte         = 2080
-regimen.fiscal    = FALSE ## en donde FALSE indica regimen sobre ingresos
+horizonte         = 2062
+regimen.fiscal    = TRUE ## en donde FALSE indica regimen sobre ingresos
 split.puertos     = 0.5
 pct.royalty       = 0.05
 pct.gastos.comercializacion = 0.025
-tasa.retorno.manual = FALSE
 
 
 # Leyendas data frame -----------------------------------------------------
@@ -62,20 +65,20 @@ tasa.retorno.manual = FALSE
 
 # Demanda -----------------------------------------------------------------
 
-  
-modelo.base <- function(n                 = 30,
-                        r                 = 0.05, ## Tasa financiamiento
-                        tasa.descuento    = 0.08,
-                        pct.financiado    = 0.6,
-                        tipo.demanda      = "min",
-                        isr               = 0.07,
-                        isr2              = 0.25,
-                        horizonte         = 2062,
-                        regimen.fiscal    = TRUE, ## en donde FALSE indica regimen sobre ingresos
-                        split.puertos     = 0.5,
-                        pct.royalty       = 0.05,
-                        pct.gastos.comercializacion = 0.025,
-                        tasa.retorno.manual = FALSE) {
+#   
+# modelo.base <- function(n                 = 30,
+#                         r                 = 0.05, ## Tasa financiamiento
+#                         tasa.descuento    = 0.08,
+#                         pct.financiado    = 0.6,
+#                         tipo.demanda      = "min",
+#                         isr               = 0.07,
+#                         isr2              = 0.25,
+#                         horizonte         = 2062,
+#                         regimen.fiscal    = TRUE, ## en donde FALSE indica regimen sobre ingresos
+#                         split.puertos     = 0.5,
+#                         pct.royalty       = 0.05,
+#                         pct.gastos.comercializacion = 0.025,
+#                         tasa.retorno.manual = FALSE) {
   
     
   Demanda <-   Demanda %>%
@@ -499,7 +502,7 @@ modelo.base <- function(n                 = 30,
   
   
     if (tasa.retorno.manual == TRUE) {
-      expected.return <- tasa.retorno.input
+      expected.return <- tasa.descuento
     } else{
       require(rvest)
       url <- "http://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/totalbeta.html"
@@ -638,9 +641,9 @@ modelo.base <- function(n                 = 30,
     
     
     df <-  df %>% 
-      mutate(FEN      =  Inversion*pct.financiado
-             - Pago
-             + Intereses*isr2,
+      mutate(FEN = Inversion*pct.financiado
+                 - Pago
+                 + Intereses*isr2,
              Año = as.numeric(Año)) %>% 
       filter(Año <= horizonte) %>% 
       arrange(Año)
@@ -656,16 +659,16 @@ modelo.base <- function(n                 = 30,
   }
   
   ### Calculo de vp base para cada modalidad
-  valor.sistema.completo <- calcular_fen(df.sistema.completo11, r = expected.return, horizonte = 2062, res = 1, regimen.fiscal = TRUE )
-  valor.sistema11 <- map(df.sistema11, calcular_fen,  r = expected.return, horizonte = 2062, res = 1, regimen.fiscal = TRUE)
-  valor.elemento11 <- map(df.elemento11, calcular_fen,  r = expected.return, horizonte = 2062, res = 1, regimen.fiscal = TRUE)
+  valor.sistema.completo <- calcular_fen(df.sistema.completo11, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
+  valor.sistema11 <- map(df.sistema11, calcular_fen,  r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal)
+  valor.elemento11 <- map(df.elemento11, calcular_fen,  r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal)
   valor.sistema11 <- bind_rows(valor.sistema11, .id = "Sistema")
   valor.elemento11 <- bind_rows(valor.elemento11, .id = "Elemento")
   
   ### Calculo de vp del financiamiento para cada modalidad
-  valor.sistema.completo.fin <- calcular_vpnf(df.sistema.completo11, r = expected.return, horizonte = 2062, res = 1, regimen.fiscal = TRUE, pct.financiado = pct.financiado)
-  valor.sistema11.fin <- map(df.sistema11, calcular_vpnf,  r = expected.return, horizonte = 2062, res = 1, regimen.fiscal = TRUE, pct.financiado = pct.financiado)
-  valor.elemento11.fin <- map(df.elemento11, calcular_vpnf,  r = expected.return, horizonte = 2062, res = 1, regimen.fiscal = TRUE, pct.financiado = pct.financiado)
+  valor.sistema.completo.fin <- calcular_vpnf(df.sistema.completo11, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
+  valor.sistema11.fin <- map(df.sistema11, calcular_vpnf,  r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
+  valor.elemento11.fin <- map(df.elemento11, calcular_vpnf,  r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
   valor.sistema11.fin <- bind_rows(valor.sistema11.fin, .id = "Sistema")
   valor.elemento11.fin <- bind_rows(valor.elemento11.fin, .id = "Elemento")
   
@@ -676,17 +679,20 @@ modelo.base <- function(n                 = 30,
   
   valor.sistema <- left_join(valor.sistema11, valor.sistema11.fin) %>% 
                    mutate(vp.total = vp.base + vp.fin)
-  
+
   valor.elemento <- left_join(valor.elemento11, valor.elemento11.fin) %>% 
     mutate(vp.total = vp.base + vp.fin)
   
+
+
   
   resultado <- list(Completo = valor.completo, 
                     Sistema  = valor.sistema, 
                     Elemento = valor.elemento)
 
-  valor.sistema %>% split(.$Sistema)
-}
+# }
 
-res <- modelo.base()
-res
+# res <- modelo.base()
+  
+  
+
