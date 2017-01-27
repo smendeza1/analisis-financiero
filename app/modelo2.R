@@ -63,9 +63,7 @@ pct.gastos.comercializacion = 0.025
 ## SLF = san luis + 1/2 ferrocarril
 
 
-# Demanda -----------------------------------------------------------------
 
-#   
 # modelo.base <- function(n                 = 30,
 #                         r                 = 0.05, ## Tasa financiamiento
 #                         tasa.descuento    = 0.08,
@@ -79,8 +77,10 @@ pct.gastos.comercializacion = 0.025
 #                         pct.royalty       = 0.05,
 #                         pct.gastos.comercializacion = 0.025,
 #                         tasa.retorno.manual = FALSE) {
-  
-    
+#   
+
+# Demanda -----------------------------------------------------------------
+
   Demanda <-   Demanda %>%
     gather(Año,TEUS,-Escenario) %>%
     replace_na(demanda,replace = list(TEUS = 0)) %>%
@@ -689,10 +689,12 @@ pct.gastos.comercializacion = 0.025
   resultado <- list(Completo = valor.completo, 
                     Sistema  = valor.sistema, 
                     Elemento = valor.elemento)
+  
+  return(resultado)
 
 # }
 
-# res <- modelo.base()
+res <- modelo.base()
   
   
-
+res[[1]]$vp.total
