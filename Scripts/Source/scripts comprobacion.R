@@ -61,8 +61,8 @@ flujo.jordi <- read_excel("app/Datos/Intermodal/IngresosModeloJordi.xlsx",4) %>%
   gather(Año, Valor, -Sistema,-Cuenta) %>%
   spread(Cuenta, Valor) %>% 
   mutate(Año = as.numeric(Año)) %>% 
-  left_join(valorizacion.sistema11$Multimodal) %>% 
-  select(-regimen.fiscal, -Gastos.Comercializacion, -Royalty) %>% 
+  left_join(valor.sistema11$Multimodal) %>% 
+  select(-regimen.fiscal, -Royalty) %>% 
   mutate(diferencia = FENj - FEN,
          dif.por = diferencia/FENj) %>% 
   filter(Año <= 2062)
@@ -72,8 +72,7 @@ flujo.jordi %>%
   ggplot(aes(x = Año, y = dif.por)) +
     geom_point() +
     geom_hline(yintercept = 0, col = "red") +
-    scale_y_continuous(label = percent) +
-    coord_cartesian(ylim = c(-0.001,0))
+    scale_y_continuous(label = percent) 
 
 diferencias <- flujo.jordi %>% 
   mutate(diff.Ingresos = Ingresosj -Ingresos.Brutos,
