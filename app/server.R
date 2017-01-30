@@ -652,10 +652,8 @@ modelo.base <- function(n                 = 30,
 }
 
 
-server <- function(input, output) {
-  output$modelo <- renderDataTable({
-
-    r <- modelo.base(n                           = input$años.financiamiento,
+server <- shinyServer( function(input, output) {
+  r <- reactive({modelo.base(n                           = input$años.financiamiento,
                      r                           = input$tasa.financiamiento,
                      tasa.descuento              = input$tasa.descuento,
                      pct.financiado              = input$pct.financiado,
@@ -673,6 +671,8 @@ server <- function(input, output) {
                      Costos                      = Costos,
                      Inversiones                 = Inversiones,
                      Ingresos.poliducto          = Ingresos.poliducto)
-    r[[1]]
   })
+output$modelo <- renderDataTable({r()[[1]]})
+output$fen <- renderDataTable({r()[[2]]})  
 }
+)
