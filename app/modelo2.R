@@ -76,11 +76,16 @@ pct.gastos.comercializacion = 0.025
 #                         split.puertos     = 0.5,
 #                         pct.royalty       = 0.05,
 #                         pct.gastos.comercializacion = 0.025,
-#                         tasa.retorno.manual = FALSE) {
+#                         tasa.retorno.manual = FALSE,
+#                         Demanda = Demanda,
+#                         Tarifas = Tarifas,
+#                         Costos  = Costos,
+#                         Inversiones = Inversiones,
+#                         Ingresos.poliducto = Ingresos.poliducto) {
 #   
-
-# Demanda -----------------------------------------------------------------
-
+  
+  # Demanda -----------------------------------------------------------------
+  
   Demanda <-   Demanda %>%
     gather(Año,TEUS,-Escenario) %>%
     replace_na(demanda,replace = list(TEUS = 0)) %>%
@@ -117,10 +122,10 @@ pct.gastos.comercializacion = 0.025
                                 lag(Mercado,1) + lag(Mercado,2),
                                 Mercado),
               Ingresos.Brutos = if_else(Elemento != "Ferrocarril", 
-                                       Tarifa.dols*Mercado*2, 
-                                       Tarifa.dols*Mercado),
-             Royalty = Ingresos.Brutos*pct.royalty,
-             IVAxPagar = Ingresos.Brutos*0.12) 
+                                        Tarifa.dols*Mercado*2, 
+                                        Tarifa.dols*Mercado),
+              Royalty = Ingresos.Brutos*pct.royalty,
+              IVAxPagar = Ingresos.Brutos*0.12) 
     
   }else{
     Ingresos <- Ingresos %>%
@@ -128,11 +133,11 @@ pct.gastos.comercializacion = 0.025
               Mercado = if_else(Elemento == "Ferrocarril", 
                                 lag(Mercado,1) + lag(Mercado,2),
                                 Mercado),
-             Ingresos.Brutos = if_else(Elemento != "Ferrocarril",
-                                       Tarifa.dols*Mercado*2,
-                                       Tarifa.dols*Mercado),
-             Royalty = Ingresos.Brutos*pct.royalty,
-             IVAxPagar = Ingresos.Brutos*0.12) 
+              Ingresos.Brutos = if_else(Elemento != "Ferrocarril",
+                                        Tarifa.dols*Mercado*2,
+                                        Tarifa.dols*Mercado),
+              Royalty = Ingresos.Brutos*pct.royalty,
+              IVAxPagar = Ingresos.Brutos*0.12) 
     
   }
   
@@ -142,13 +147,13 @@ pct.gastos.comercializacion = 0.025
     select(Sistema, Elemento, Año, Ingresos.Brutos, Royalty, IVAxPagar)
   
   
-   Ingresos.poliducto <- Ingresos.poliducto %>%
-     gather(Año, Ingresos.Brutos, -Sistema,-Elemento ) %>%
-     mutate(Año = as.factor(Año),
-            Sistema = as.factor(Sistema),
-            Elemento = as.factor(Elemento),
-            Royalty = Ingresos.Brutos*pct.royalty,
-            IVAxPagar = Ingresos.Brutos*0.12) 
+  Ingresos.poliducto <- Ingresos.poliducto %>%
+    gather(Año, Ingresos.Brutos, -Sistema,-Elemento ) %>%
+    mutate(Año = as.factor(Año),
+           Sistema = as.factor(Sistema),
+           Elemento = as.factor(Elemento),
+           Royalty = Ingresos.Brutos*pct.royalty,
+           IVAxPagar = Ingresos.Brutos*0.12) 
   
   Ingresos <- Ingresos %>% 
     bind_rows(Ingresos.poliducto) %>%
@@ -160,20 +165,20 @@ pct.gastos.comercializacion = 0.025
   segmentar_ingreso <- function(df = Ingresos, type = "Sistema"){
     
     switch(type,
-    Sistema = Ingresos %>%
-      split(Ingresos$Sistema) %>%
-      map(select, -Elemento, -Sistema) %>%
-      map(group_by, Año) %>%
-      map(summarise_all, sum) %>% 
-      map(mutate, ISR = Ingresos.Brutos*isr),
-    Elemento = Ingresos %>%
-      split(Ingresos$Elemento) %>%
-      map(select, -Elemento, -Sistema) %>%
-      map(group_by, Año) %>%
-      map(summarise_all, sum) %>% 
-      map(mutate, ISR = Ingresos.Brutos*isr))
-    }
-    
+           Sistema = Ingresos %>%
+             split(Ingresos$Sistema) %>%
+             map(select, -Elemento, -Sistema) %>%
+             map(group_by, Año) %>%
+             map(summarise_all, sum) %>% 
+             map(mutate, ISR = Ingresos.Brutos*isr),
+           Elemento = Ingresos %>%
+             split(Ingresos$Elemento) %>%
+             map(select, -Elemento, -Sistema) %>%
+             map(group_by, Año) %>%
+             map(summarise_all, sum) %>% 
+             map(mutate, ISR = Ingresos.Brutos*isr))
+  }
+  
   ingresos.sistema11 <- segmentar_ingreso(type = "Sistema")
   ingresos.elemento11 <- segmentar_ingreso(type = "Elemento")
   
@@ -247,23 +252,23 @@ pct.gastos.comercializacion = 0.025
                          c(0,df$Infraestructura))
     
     pago.anticipado <-  -pmt(r = tasa.descuento.ice,
-                                     n = n.canon,
-                                     pv = inversion.tmp,
-                                     fv = 0)*1.05*n.canon*pct.pago.anticipado
+                             n = n.canon,
+                             pv = inversion.tmp,
+                             fv = 0)*1.05*n.canon*pct.pago.anticipado
     
     res[1,2] <- pago.anticipado
     
     inversion.tmp <- inversion.tmp*(1 - pct.pago.anticipado)
     
     pago <- -pmt(r = tasa.descuento.ice,
-         n = n.canon,
-         pv = inversion.tmp,
-         fv = 0)*1.05
+                 n = n.canon,
+                 pv = inversion.tmp,
+                 fv = 0)*1.05
     
     res[2:nrow(res),2] <- pago
     res$Año <- as.factor(res$Año)
     res
-    }
+  }
   
   canon.concesion <- function(valor = 5500000,
                               tasa.descuento.ice = 0.04,
@@ -272,10 +277,10 @@ pct.gastos.comercializacion = 0.025
     
     
     pago.anticipado <- -pmt(r = tasa.descuento.ice,
-                 n = n.canon,
-                 pv = valor,
-                 fv = 0)*n.canon*pct.pago.anticipado
-  
+                            n = n.canon,
+                            pv = valor,
+                            fv = 0)*n.canon*pct.pago.anticipado
+    
     valor <- valor *(1 - pct.pago.anticipado)
     pago <- -pmt(r = tasa.descuento.ice,
                  n = n.canon,
@@ -291,14 +296,14 @@ pct.gastos.comercializacion = 0.025
                                               spread, 
                                               Componente, 
                                               Inversion) %>% 
-                                          map(canon.infraestructura)
+    map(canon.infraestructura)
   
   
   valor.canon.infraestructura.sistema <- map(inversiones.sistema10, 
-                                              spread, 
-                                              Componente, 
-                                              Inversion) %>% 
-                                         map(canon.infraestructura)
+                                             spread, 
+                                             Componente, 
+                                             Inversion) %>% 
+    map(canon.infraestructura)
   
   
   # Costos ------------------------------------------------------------------
@@ -307,7 +312,7 @@ pct.gastos.comercializacion = 0.025
   segmentar_costos <- function(df = Costos, type) {
     require(dplyr)
     require(purrr)
-  
+    
     switch(type,
            SF = df %>% 
              mutate(Sistema = as.factor(Sistema)) %>%
@@ -354,58 +359,15 @@ pct.gastos.comercializacion = 0.025
   
   
   amortizacion <- function(df,pct.financiado = 1, n = 30, r = 0.07 ){
-  require(tidyverse)
-      
-  n.inversiones <- df %>% filter(Inversion != 0) %>% nrow()
-  
-  primer.ingreso <- filter(df, Ingresos.Brutos != 0)
-  primer.ingreso <- primer.ingreso$Año %>%  as.character() %>% as.numeric() %>% min()
-  
-  df <- df %>% filter(Inversion != 0)
-  inversion.input <- df[1,]
-  inversion.input$Inversion <- inversion.input$Inversion*pct.financiado
-  año.inversion <- inversion.input$Año %>% as.character() %>% as.numeric()
-  
-  ### Definicion periodo de gracia
-  if (año.inversion < primer.ingreso ) {
-    pg = primer.ingreso - año.inversion
-  }else{
-    pg = 0 
-  }
-  
-  # creacion de escenario inversión -----------------------------------------
-  ## al momento de crear el escenario sumo n+pg por el periodo de gracia de cada pago
-  escenario <- data_frame(Año = numeric(n + pg), 
-                          Saldo = numeric(n + pg),
-                          Intereses = numeric(n + pg),
-                          Amortizacion = numeric(n + pg))
-  escenario$Año <- seq_len(n + pg) + año.inversion - 1 # Llenado de los años correspondientes al escenario
-  escenario$Amortizacion <- inversion.input$Inversion/n # Calculo de los pagos de amortización anuales
-   
-  
-  if (pg == 0) {
+    require(tidyverse)
     
-    escenario <- escenario %>% 
-      mutate(Saldo = inversion.input$Inversion - cumsum(escenario$Amortizacion),
-             Intereses = (Saldo + Amortizacion)*r)
+    n.inversiones <- df %>% filter(Inversion != 0) %>% nrow()
     
-  }else {
-    escenario$Amortizacion[1:pg] <- 0 # Set de periodo de gracia
-    escenario <- escenario %>% 
-      mutate(Saldo = inversion.input$Inversion - cumsum(escenario$Amortizacion),
-             Intereses = (Saldo + Amortizacion)*r)
-  }
-  
-  
-  if(exists("Componente",df)) {
-    escenario  <- escenario %>% mutate(Pago = Intereses + Amortizacion)
-    escenario$Componente <- inversion.input$Componente
-  } else {
-    escenario  <- escenario %>% mutate(Pago = Intereses + Amortizacion)
-  }
-  
-  for (i in 2:n.inversiones) {
-    inversion.input <- df[i,]
+    primer.ingreso <- filter(df, Ingresos.Brutos != 0)
+    primer.ingreso <- primer.ingreso$Año %>%  as.character() %>% as.numeric() %>% min()
+    
+    df <- df %>% filter(Inversion != 0)
+    inversion.input <- df[1,]
     inversion.input$Inversion <- inversion.input$Inversion*pct.financiado
     año.inversion <- inversion.input$Año %>% as.character() %>% as.numeric()
     
@@ -418,51 +380,94 @@ pct.gastos.comercializacion = 0.025
     
     # creacion de escenario inversión -----------------------------------------
     ## al momento de crear el escenario sumo n+pg por el periodo de gracia de cada pago
-    tmp <- data_frame(Año = numeric(n + pg), 
+    escenario <- data_frame(Año = numeric(n + pg), 
                             Saldo = numeric(n + pg),
                             Intereses = numeric(n + pg),
                             Amortizacion = numeric(n + pg))
-    tmp$Año <- seq_len(n + pg) + año.inversion - 1 # Llenado de los años correspondientes al escenario
-    tmp$Amortizacion <- inversion.input$Inversion/n # Calculo de los pagos de amortización anuales
+    escenario$Año <- seq_len(n + pg) + año.inversion - 1 # Llenado de los años correspondientes al escenario
+    escenario$Amortizacion <- inversion.input$Inversion/n # Calculo de los pagos de amortización anuales
     
     
     if (pg == 0) {
       
-      tmp <- tmp %>% 
-        mutate(Saldo = inversion.input$Inversion - cumsum(tmp$Amortizacion),
+      escenario <- escenario %>% 
+        mutate(Saldo = inversion.input$Inversion - cumsum(escenario$Amortizacion),
                Intereses = (Saldo + Amortizacion)*r)
       
     }else {
-      tmp$Amortizacion[1:pg] <- 0 # Set de periodo de gracia
-      tmp <- tmp %>% 
-        mutate(Saldo = inversion.input$Inversion - cumsum(tmp$Amortizacion),
+      escenario$Amortizacion[1:pg] <- 0 # Set de periodo de gracia
+      escenario <- escenario %>% 
+        mutate(Saldo = inversion.input$Inversion - cumsum(escenario$Amortizacion),
                Intereses = (Saldo + Amortizacion)*r)
     }
     
-    if (exists("Componente",df)) {
-      tmp  <- tmp %>% mutate(Pago = Intereses + Amortizacion)
-      tmp$Componente <- inversion.input$Componente
+    
+    if(exists("Componente",df)) {
+      escenario  <- escenario %>% mutate(Pago = Intereses + Amortizacion)
+      escenario$Componente <- inversion.input$Componente
     } else {
-      tmp  <- tmp %>% mutate(Pago = Intereses + Amortizacion)
+      escenario  <- escenario %>% mutate(Pago = Intereses + Amortizacion)
     }
     
-    escenario <- rbind(escenario, tmp)
-  }
-  
-  if (exists("Componente",df)) {
-    escenario <- escenario %>% 
-      group_by(Año, Componente) %>% 
-      summarise_all(sum)
-    escenario 
-  }else{
-    escenario <- escenario %>% 
-      group_by(Año) %>% 
-      summarise_all(sum)
+    for (i in 2:n.inversiones) {
+      inversion.input <- df[i,]
+      inversion.input$Inversion <- inversion.input$Inversion*pct.financiado
+      año.inversion <- inversion.input$Año %>% as.character() %>% as.numeric()
+      
+      ### Definicion periodo de gracia
+      if (año.inversion < primer.ingreso ) {
+        pg = primer.ingreso - año.inversion
+      }else{
+        pg = 0 
+      }
+      
+      # creacion de escenario inversión -----------------------------------------
+      ## al momento de crear el escenario sumo n+pg por el periodo de gracia de cada pago
+      tmp <- data_frame(Año = numeric(n + pg), 
+                        Saldo = numeric(n + pg),
+                        Intereses = numeric(n + pg),
+                        Amortizacion = numeric(n + pg))
+      tmp$Año <- seq_len(n + pg) + año.inversion - 1 # Llenado de los años correspondientes al escenario
+      tmp$Amortizacion <- inversion.input$Inversion/n # Calculo de los pagos de amortización anuales
+      
+      
+      if (pg == 0) {
+        
+        tmp <- tmp %>% 
+          mutate(Saldo = inversion.input$Inversion - cumsum(tmp$Amortizacion),
+                 Intereses = (Saldo + Amortizacion)*r)
+        
+      }else {
+        tmp$Amortizacion[1:pg] <- 0 # Set de periodo de gracia
+        tmp <- tmp %>% 
+          mutate(Saldo = inversion.input$Inversion - cumsum(tmp$Amortizacion),
+                 Intereses = (Saldo + Amortizacion)*r)
+      }
+      
+      if (exists("Componente",df)) {
+        tmp  <- tmp %>% mutate(Pago = Intereses + Amortizacion)
+        tmp$Componente <- inversion.input$Componente
+      } else {
+        tmp  <- tmp %>% mutate(Pago = Intereses + Amortizacion)
+      }
+      
+      escenario <- rbind(escenario, tmp)
+    }
+    
+    if (exists("Componente",df)) {
+      escenario <- escenario %>% 
+        group_by(Año, Componente) %>% 
+        summarise_all(sum)
+      escenario 
+    }else{
+      escenario <- escenario %>% 
+        group_by(Año) %>% 
+        summarise_all(sum)
+      escenario$Año <- as.factor(escenario$Año)
+      escenario
+    }
     escenario$Año <- as.factor(escenario$Año)
     escenario
-  }
-  escenario$Año <- as.factor(escenario$Año)
-  escenario
   }
   
   financiamiento.sistema11 <- inversiones.sistema11 %>% 
@@ -501,66 +506,66 @@ pct.gastos.comercializacion = 0.025
   ### Calculo de la tasa de retorno esperada
   
   
-    if (tasa.retorno.manual == TRUE) {
-      expected.return <- tasa.descuento
+  if (tasa.retorno.manual == TRUE) {
+    expected.return <- tasa.descuento
+  } else{
+    require(rvest)
+    url <- "http://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/totalbeta.html"
+    url2 <- "http://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html"
+    
+    safe_read <- safely(read_html)
+    prueba <- safe_read(url)
+    
+    
+    if (is_null(prueba$result)) {
+      betas <- readRDS("Datos/Intermodal/betas2017-01-25.rds")
+      tasas <- readRDS("Datos/Intermodal/tasas2017-01-25.rds")
+      
     } else{
-      require(rvest)
-      url <- "http://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/totalbeta.html"
-      url2 <- "http://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html"
+      betas <- read_html(url) %>% 
+        html_nodes(xpath = "/html/body/table") %>% 
+        html_table()
       
-      safe_read <- safely(read_html)
-      prueba <- safe_read(url)
+      fecha.consulta <- Sys.Date()
+      flname <- paste0("Datos/Intermodal/betas",fecha.consulta,".rds")
+      saveRDS(object = betas ,file = flname)
       
+      tasas <- read_html(url2) %>% 
+        html_table()
       
-        if (is_null(prueba$result)) {
-        betas <- readRDS("app/Datos/Intermodal/betas2017-01-25.rds")
-        tasas <- readRDS("app/Datos/Intermodal/tasas2017-01-25.rds")
-        
-      } else{
-        betas <- read_html(url) %>% 
-          html_nodes(xpath = "/html/body/table") %>% 
-          html_table()
-        
-        fecha.consulta <- Sys.Date()
-        flname <- paste0("app/Datos/Intermodal/betas",fecha.consulta,".rds")
-        saveRDS(object = betas ,file = flname)
-        
-        tasas <- read_html(url2) %>% 
-          html_table()
-        
-        flname <- paste0("app/Datos/Intermodal/tasas",fecha.consulta,".rds")
-        saveRDS(object = tasas ,file = flname)
-      }
-      
-      
-      betas <- as.data.frame(betas)
-      names(betas) <- betas[1,]
-      betas <- betas[c(91,92),c(1,3)]
-      beta <- betas$`Average Unlevered Beta` %>% 
-        as.numeric() %>% 
-        mean()
-      
-      tasas <- as.data.frame(tasas)
-      names(tasas) <- tasas[2,]
-      
-      tasas  <- tasas[3:nrow(tasas),] 
-      tasas.promedio <- tail(tasas,9) %>% head(4)
-      nombres <- c("periodo","SP500","3month.bill","10year.bond")
-      tasas <- tasas.promedio[1:4] 
-      names(tasas) <- nombres
-      tasas <- tasas[2:nrow(tasas),]
-      
-      rm <- tasas[3,2]
-      rf <- tasas[3,4]
-      rm <- rm %>% str_replace("%","")
-      rm <- as.numeric(rm)/100
-      
-      rf <- rf %>% str_replace("%","")
-      rf <- as.numeric(rf)/100
-      expected.return <- rf + beta*(rm - rf)
-      financial.data <- data.frame(expected.return, rf, rm,beta)
-      financial.data
+      flname <- paste0("Datos/Intermodal/tasas",fecha.consulta,".rds")
+      saveRDS(object = tasas ,file = flname)
     }
+    
+    
+    betas <- as.data.frame(betas)
+    names(betas) <- betas[1,]
+    betas <- betas[c(91,92),c(1,3)]
+    beta <- betas$`Average Unlevered Beta` %>% 
+      as.numeric() %>% 
+      mean()
+    
+    tasas <- as.data.frame(tasas)
+    names(tasas) <- tasas[2,]
+    
+    tasas  <- tasas[3:nrow(tasas),] 
+    tasas.promedio <- tail(tasas,9) %>% head(4)
+    nombres <- c("periodo","SP500","3month.bill","10year.bond")
+    tasas <- tasas.promedio[1:4] 
+    names(tasas) <- nombres
+    tasas <- tasas[2:nrow(tasas),]
+    
+    rm <- tasas[3,2]
+    rf <- tasas[3,4]
+    rm <- rm %>% str_replace("%","")
+    rm <- as.numeric(rm)/100
+    
+    rf <- rf %>% str_replace("%","")
+    rf <- as.numeric(rf)/100
+    expected.return <- rf + beta*(rm - rf)
+    financial.data <- data.frame(expected.return, rf, rm,beta)
+    financial.data
+  }
   
   expected.return <- financial.data[["expected.return"]]
   
@@ -629,10 +634,10 @@ pct.gastos.comercializacion = 0.025
     tir <- irr(df$FEN)
     
     if (res == 1) {
-    res <- data.frame(flujo.base, vp.base, tir)
+      res <- data.frame(flujo.base, vp.base, tir)
     } else {
-    df
-  }
+      df
+    }
   }
   calcular_vpnf <- function(df,r,horizonte = 2062, res = 1, regimen.fiscal = FALSE,
                             pct.financiado = pct.financiado){
@@ -642,8 +647,8 @@ pct.gastos.comercializacion = 0.025
     
     df <-  df %>% 
       mutate(FEN = Inversion*pct.financiado
-                 - Pago
-                 + Intereses*isr2,
+             - Pago
+             + Intereses*isr2,
              Año = as.numeric(Año)) %>% 
       filter(Año <= horizonte) %>% 
       arrange(Año)
@@ -675,26 +680,24 @@ pct.gastos.comercializacion = 0.025
   ### DF para cada variedad
   valor.completo <- bind_cols(list(valor.sistema.completo,
                                    valor.sistema.completo.fin)) %>% 
-                    mutate(vp.total = vp.base + vp.fin)
+    mutate(vp.total = vp.base + vp.fin)
   
   valor.sistema <- left_join(valor.sistema11, valor.sistema11.fin) %>% 
-                   mutate(vp.total = vp.base + vp.fin)
-
+    mutate(vp.total = vp.base + vp.fin)
+  
   valor.elemento <- left_join(valor.elemento11, valor.elemento11.fin) %>% 
     mutate(vp.total = vp.base + vp.fin)
   
-
-
+  
+  
   
   resultado <- list(Completo = valor.completo, 
                     Sistema  = valor.sistema, 
                     Elemento = valor.elemento)
   
-  return(resultado)
-
+  resultado
+  
 # }
 
-res <- modelo.base()
-  
-  
-res[[1]]$vp.total
+
+
