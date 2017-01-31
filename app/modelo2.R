@@ -232,45 +232,8 @@ pct.gastos.comercializacion = 0.025
   
   
   ## Funcion que sirve para calcular los anticipos y las anualidades de cada canon
-  ## en donde el primer canon se refiere al valor de renta de infraestructura  y
-  ## el segundo canon al valor de la concesión del corredor
   
-  canon.infraestructura <- function(df, 
-                                    tasa.descuento.ice = 0.04, 
-                                    n.canon = 30, 
-                                    pct.pago.anticipado = 0.1,
-                                    año.primer.ingreso = 2018){
-    
-    
-    res <- data.frame(Año = numeric(n.canon + 1),
-                      Canon.infr = numeric(n.canon + 1))
-    
-    res[1] <- año.primer.ingreso - 3
-    res[1] <- seq_len(n.canon + 1) + res[1] - 1
-    
-    inversion.tmp <- npv(r = tasa.descuento.ice, 
-                         c(0,df$Infraestructura))
-    
-    pago.anticipado <-  -pmt(r = tasa.descuento.ice,
-                             n = n.canon,
-                             pv = inversion.tmp,
-                             fv = 0)*1.05*n.canon*pct.pago.anticipado
-    
-    res[1,2] <- pago.anticipado
-    
-    inversion.tmp <- inversion.tmp*(1 - pct.pago.anticipado)
-    
-    pago <- -pmt(r = tasa.descuento.ice,
-                 n = n.canon,
-                 pv = inversion.tmp,
-                 fv = 0)*1.05
-    
-    res[2:nrow(res),2] <- pago
-    res$Año <- as.factor(res$Año)
-    res
-  }
-  
-  canon.concesion <- function(valor = 5500000,
+  canon <- function(valor = 5500000,
                               tasa.descuento.ice = 0.04,
                               n.canon = 30,
                               pct.pago.anticipado = 0.1){
@@ -281,7 +244,7 @@ pct.gastos.comercializacion = 0.025
                             pv = valor,
                             fv = 0)*n.canon*pct.pago.anticipado
     
-    valor <- valor *(1 - pct.pago.anticipado)
+    valor <- valor*(1 - pct.pago.anticipado)
     pago <- -pmt(r = tasa.descuento.ice,
                  n = n.canon,
                  pv = valor,
@@ -289,23 +252,7 @@ pct.gastos.comercializacion = 0.025
     res <- data.frame(pago = pago, pago.anticipado = pago.anticipado)
     res
   }
-  
-  ## estos valores de canon me van a servir para los escenario 10 y 00
-  
-  valor.canon.infraestructura.elemento <- map(inversiones.elemento10, 
-                                              spread, 
-                                              Componente, 
-                                              Inversion) %>% 
-    map(canon.infraestructura)
-  
-  
-  valor.canon.infraestructura.sistema <- map(inversiones.sistema10, 
-                                             spread, 
-                                             Componente, 
-                                             Inversion) %>% 
-    map(canon.infraestructura)
-  
-  
+
   # Costos ------------------------------------------------------------------
   
   
@@ -689,15 +636,41 @@ pct.gastos.comercializacion = 0.025
     mutate(vp.total = vp.base + vp.fin)
   
   
-  
+  valor.completo$vp.total %>% formattable::currency()
   
   resultado <- list(Completo = valor.completo, 
                     Sistema  = valor.sistema, 
                     Elemento = valor.elemento)
   
-  resultado
+
+
+# Evaluacion modalidad 10 -------------------------------------------------
+
+  df <- df.sistema11$Multimodal
+  primer.año <- df$Año %>% as.numeric() %>% min()
+  df$Año <- df$Año %>% as.numeric()
+  tmp.valor <- valor.sistema$vp.total[valor.sistema$Sistema == "Multimodal"]
+  tmp.canon <- canon(valor = tmp.valor, tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = 0.15)
   
-# }
-
-
-
+  df$Anticipo.Concesion <- 0
+  df$Anticipo.Concesion[df$Año == primer.año] <- tmp.canon$pago.anticipado
+  
+  tmp.años <- primer.año + seq(1:50)
+  df$Concesion <- 0
+  
+  df$Concesion[df$Año %in% tmp.años] <- tmp.canon$pago
+  
+  tmp.inv <- inversiones.sistema10$Multimodal %>% 
+    filter(Componente != "Superestructura") %>% 
+    spread(Componente, Inversion) %>% 
+    ungroup()
+  
+  tmp.valor <-  npv(r = 0.04, cf = tmp.inv$Infraestructura)
+  tmp.canon <- canon(valor = tmp.valor, tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = 0.15)
+  
+  df$Anticipo.Canon.Infra <- 0
+  df$Anticipo.Canon.Infra[df$Año == primer.año] <- tmp.canon$pago.anticipado
+  df$Infra[df$Año %in% tmp.años] <- tmp.canon$pago
+  
+  costos.sistema10$Multimodal$Componente %>% unique()
+  
