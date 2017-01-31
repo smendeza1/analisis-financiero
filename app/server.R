@@ -672,7 +672,7 @@ server <- shinyServer( function(input, output) {
                      Inversiones                 = Inversiones,
                      Ingresos.poliducto          = Ingresos.poliducto)
   })
-output$modelo <- renderDataTable({r()[[1]]})
-output$fen <- renderDataTable({r()[[2]]})  
+output$total <- renderDataTable({r()[[1]]})
+output$sistema <- renderDataTable({r()[[2]]})  
 }
 )

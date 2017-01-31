@@ -23,8 +23,8 @@ ui <- navbarPage(title="Analisis Financiero",
       sliderInput("isr2","Impuesto sobre la renta: Sobre utilidades",  min = 0.25, max = 0.4, value = 0.25, step = 0.05)
     ),
     mainPanel(tabsetPanel(
-      tabPanel("Resultado analisis",dataTableOutput("modelo")),
-      tabPanel("Flujo Efectivo",dataTableOutput("fen")))
+      tabPanel("VPN Proyecto",dataTableOutput("total")),
+      tabPanel("VPN por Sistema",dataTableOutput("sistema")))
   )
   )
 )
