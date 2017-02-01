@@ -182,6 +182,8 @@ pct.gastos.comercializacion = 0.025
   ingresos.sistema11 <- segmentar_ingreso(type = "Sistema")
   ingresos.elemento11 <- segmentar_ingreso(type = "Elemento")
   
+  ingresos.sistema11
+  
   # Inversiones y canones de infraestructura y concesión -------------------------------------------------------------
   
   
@@ -434,9 +436,7 @@ pct.gastos.comercializacion = 0.025
     map(mutate, IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
         IVA.aux2 = IVAxCobrar - IVAxPagar,
         IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) 
-  
-  
-  
+
   
   impuestos.elemento11 <- map2(ingresos.elemento11,inversiones.elemento11,left_join) %>%
     map2(costos.elemento11, left_join, by = "Año") %>%
@@ -644,33 +644,92 @@ pct.gastos.comercializacion = 0.025
   
 
 
-# Evaluacion modalidad 10 -------------------------------------------------
+# Calculo de canones Concesión e Infraestructura-------------------------------------------------
 
-  df <- df.sistema11$Multimodal
-  primer.año <- df$Año %>% as.numeric() %>% min()
-  df$Año <- df$Año %>% as.numeric()
-  tmp.valor <- valor.sistema$vp.total[valor.sistema$Sistema == "Multimodal"]
-  tmp.canon <- canon(valor = tmp.valor, tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = 0.15)
+### Calculo valor de concesion
   
-  df$Anticipo.Concesion <- 0
-  df$Anticipo.Concesion[df$Año == primer.año] <- tmp.canon$pago.anticipado
+concesion.completo <- valor.completo$vp.base %>%   
+    canon(tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = 0.15)
+ 
+concesion.sistema  <-  valor.sistema$vp.base %>% 
+    canon(tasa.descuento.ice = r.ice, n.canon = c(30,50), pct.pago.anticipado = 0.15)
   
-  tmp.años <- primer.año + seq(1:50)
-  df$Concesion <- 0
-  
-  df$Concesion[df$Año %in% tmp.años] <- tmp.canon$pago
-  
-  tmp.inv <- inversiones.sistema10$Multimodal %>% 
-    filter(Componente != "Superestructura") %>% 
-    spread(Componente, Inversion) %>% 
-    ungroup()
-  
-  tmp.valor <-  npv(r = 0.04, cf = tmp.inv$Infraestructura)
-  tmp.canon <- canon(valor = tmp.valor, tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = 0.15)
-  
-  df$Anticipo.Canon.Infra <- 0
-  df$Anticipo.Canon.Infra[df$Año == primer.año] <- tmp.canon$pago.anticipado
-  df$Infra[df$Año %in% tmp.años] <- tmp.canon$pago
-  
-  costos.sistema10$Multimodal$Componente %>% unique()
-  
+concesion.sistema$Sistema <- valor.sistema$Sistema  
+
+concesion.elemento <-  valor.elemento$vp.base %>% 
+    canon(tasa.descuento.ice = r.ice, n.canon = c(50,30,50,50), pct.pago.anticipado = 0.15)
+
+concesion.elemento$Elemento <- valor.elemento$Elemento
+
+
+
+### Calculo uso infraestructuras
+
+canon.infra.completo <- inversiones.sistema10 %>% 
+  bind_rows(.id = "Sistema") %>% 
+  filter(Componente == "Infraestructura") %>% 
+  select(Sistema, Año, Inversion) %>% 
+  group_by(Año) %>% 
+  summarize(Inversion = sum(Inversion)) %>% 
+  .$Inversion %>% 
+  npv(r = r.ice) %>% 
+  canon(tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = 0.15)
+
+canon.infra.sistema <- inversiones.sistema10  %>% 
+  map(filter, Componente == "Infraestructura") %>% 
+  map(ungroup) %>% 
+  map(select, Inversion) %>% 
+  map(function(df) npv(r = r.ice, cf = df$Inversion)) %>% 
+  bind_rows() %>% 
+  gather(Sistema, Canon.ICE) %>% 
+  .$Canon.ICE %>% 
+  canon(tasa.descuento.ice = r.ice, n.canon = c(30,50), pct.pago.anticipado = 0.15)
+
+canon.infra.sistema$Sistema <- valor.sistema$Sistema  
+
+canon.infra.elemento <- inversiones.elemento10  %>% 
+  map(filter, Componente == "Infraestructura") %>% 
+  map(ungroup) %>% 
+  map(select, Inversion) %>% 
+  map(function(df) npv(r = r.ice, cf = df$Inversion)) %>% 
+  bind_rows() %>% 
+  gather(Elemento, Canon.ICE) %>% 
+  .$Canon.ICE %>% 
+  canon(tasa.descuento.ice = r.ice, n.canon = c(30,50), pct.pago.anticipado = 0.15)
+
+canon.infra.elemento$Elemento <- valor.elemento$Elemento
+
+concesion.completo
+concesion.sistema
+concesion.elemento
+canon.infra.completo
+canon.infra.sistema
+canon.infra.elemento
+  # df <- df.sistema11$Multimodal
+  # primer.año <- df$Año %>% as.numeric() %>% min()
+  # df$Año <- df$Año %>% as.numeric()
+  # tmp.valor <- valor.sistema$vp.total[valor.sistema$Sistema == "Multimodal"]
+  # tmp.canon <- canon(valor = tmp.valor, tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = 0.15)
+  # 
+  # df$Anticipo.Concesion <- 0
+  # df$Anticipo.Concesion[df$Año == primer.año] <- tmp.canon$pago.anticipado
+  # 
+  # tmp.años <- primer.año + seq(1:50)
+  # df$Concesion <- 0
+  # 
+  # df$Concesion[df$Año %in% tmp.años] <- tmp.canon$pago
+  # 
+  # tmp.inv <- inversiones.sistema10$Multimodal %>% 
+  #   filter(Componente != "Superestructura") %>% 
+  #   spread(Componente, Inversion) %>% 
+  #   ungroup()
+  # 
+  # tmp.valor <-  npv(r = 0.04, cf = tmp.inv$Infraestructura)
+  # tmp.canon <- canon(valor = tmp.valor, tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = 0.15)
+  # 
+  # df$Anticipo.Canon.Infra <- 0
+  # df$Anticipo.Canon.Infra[df$Año == primer.año] <- tmp.canon$pago.anticipado
+  # df$Infra[df$Año %in% tmp.años] <- tmp.canon$pago
+  # 
+  # costos.sistema10$Multimodal$Componente %>% unique()
+  # 
