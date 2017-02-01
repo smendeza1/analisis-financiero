@@ -31,6 +31,7 @@ regimen.fiscal    = TRUE ## en donde FALSE indica regimen sobre ingresos
 split.puertos     = 0.5
 pct.royalty       = 0.05
 pct.gastos.comercializacion = 0.025
+pct.pago.anticipado = 0.15
 
 
 # Leyendas data frame -----------------------------------------------------
@@ -465,8 +466,8 @@ pct.gastos.comercializacion = 0.025
     
     
     if (is_null(prueba$result)) {
-      betas <- readRDS("Datos/Intermodal/betas2017-01-25.rds")
-      tasas <- readRDS("Datos/Intermodal/tasas2017-01-25.rds")
+      betas <- readRDS("app/Datos/Intermodal/betas2017-01-25.rds")
+      tasas <- readRDS("app/Datos/Intermodal/tasas2017-01-25.rds")
       
     } else{
       betas <- read_html(url) %>% 
@@ -474,13 +475,13 @@ pct.gastos.comercializacion = 0.025
         html_table()
       
       fecha.consulta <- Sys.Date()
-      flname <- paste0("Datos/Intermodal/betas",fecha.consulta,".rds")
+      flname <- paste0("app/Datos/Intermodal/betas",fecha.consulta,".rds")
       saveRDS(object = betas ,file = flname)
       
       tasas <- read_html(url2) %>% 
         html_table()
       
-      flname <- paste0("Datos/Intermodal/tasas",fecha.consulta,".rds")
+      flname <- paste0("app/Datos/Intermodal/tasas",fecha.consulta,".rds")
       saveRDS(object = tasas ,file = flname)
     }
     
@@ -649,15 +650,15 @@ pct.gastos.comercializacion = 0.025
 ### Calculo valor de concesion
   
 concesion.completo <- valor.completo$vp.base %>%   
-    canon(tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = 0.15)
+    canon(tasa.descuento.ice = r.ice, n.canon = n.concesion.multi, pct.pago.anticipado = 0.15)
  
 concesion.sistema  <-  valor.sistema$vp.base %>% 
-    canon(tasa.descuento.ice = r.ice, n.canon = c(30,50), pct.pago.anticipado = 0.15)
+    canon(tasa.descuento.ice = r.ice, n.canon = c(n.concesion.poli,n.concesion.multi), pct.pago.anticipado = 0.15)
   
 concesion.sistema$Sistema <- valor.sistema$Sistema  
 
 concesion.elemento <-  valor.elemento$vp.base %>% 
-    canon(tasa.descuento.ice = r.ice, n.canon = c(50,30,50,50), pct.pago.anticipado = 0.15)
+    canon(tasa.descuento.ice = r.ice, n.canon = c(n.concesion.multi,n.concesion.poli,n.concesion.multi,n.concesion.multi), pct.pago.anticipado = 0.15)
 
 concesion.elemento$Elemento <- valor.elemento$Elemento
 
@@ -673,7 +674,7 @@ canon.infra.completo <- inversiones.sistema10 %>%
   summarize(Inversion = sum(Inversion)) %>% 
   .$Inversion %>% 
   npv(r = r.ice) %>% 
-  canon(tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = 0.15)
+  canon(tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = pct.pago.anticipado)
 
 canon.infra.sistema <- inversiones.sistema10  %>% 
   map(filter, Componente == "Infraestructura") %>% 
@@ -683,7 +684,7 @@ canon.infra.sistema <- inversiones.sistema10  %>%
   bind_rows() %>% 
   gather(Sistema, Canon.ICE) %>% 
   .$Canon.ICE %>% 
-  canon(tasa.descuento.ice = r.ice, n.canon = c(30,50), pct.pago.anticipado = 0.15)
+  canon(tasa.descuento.ice = r.ice, n.canon = c(30,50), pct.pago.anticipado = pct.pago.anticipado)
 
 canon.infra.sistema$Sistema <- valor.sistema$Sistema  
 
@@ -695,16 +696,40 @@ canon.infra.elemento <- inversiones.elemento10  %>%
   bind_rows() %>% 
   gather(Elemento, Canon.ICE) %>% 
   .$Canon.ICE %>% 
-  canon(tasa.descuento.ice = r.ice, n.canon = c(30,50), pct.pago.anticipado = 0.15)
+  canon(tasa.descuento.ice = r.ice, n.canon = c(30,50), pct.pago.anticipado = pct.pago.anticipado)
 
 canon.infra.elemento$Elemento <- valor.elemento$Elemento
 
+#### Prueba para crear df "costos.adicionales" que usare para la evaluacion de fen para sistema y un tercero 
 concesion.completo
+costos.adicionales <- data.frame(Año = numeric(n.concesion.multi),
+                                 Anticipo.Concesion = numeric(n.concesion.multi),
+                                 Pago.Concesion = numeric(n.concesion.multi) )
+
+costos.adicionales[1,] <- c(2012, concesion.completo$pago.anticipado, 0)
+costos.adicionales$Año <- seq(1:n.concesion.multi) + 2012 - 1
+costos.adicionales$Pago.Concesion[2:n.concesion.multi] <- concesion.completo$pago
+costos.adicionales <- costos.adicionales %>% 
+  mutate(IVAxCobrar = (Anticipo.Concesion + Pago.Concesion)*0.12)
+
 concesion.sistema
 concesion.elemento
 canon.infra.completo
 canon.infra.sistema
 canon.infra.elemento
+
+costos.sistema.3ro <- costos.sistema10 %>% 
+  map(filter, Componente != "Infraestructura")
+inversiones.sistema.3ro <- inversiones.sistema10 %>% 
+  map(filter, Componente != "Infraestructura")
+
+
+costos.sistema.propios <- costos.sistema10 %>% 
+  map(filter, Componente == "Infraestructura")
+
+costos.sistema.propios
+
+
   # df <- df.sistema11$Multimodal
   # primer.año <- df$Año %>% as.numeric() %>% min()
   # df$Año <- df$Año %>% as.numeric()
