@@ -237,19 +237,20 @@ pct.pago.anticipado = 0.15
   ## Funcion que sirve para calcular los anticipos y las anualidades de cada canon
   
   canon <- function(valor = 5500000,
-                              tasa.descuento.ice = 0.04,
-                              n.canon = 30,
-                              pct.pago.anticipado = 0.1){
+                    tasa.descuento.ice = 0.04,
+                    n.canon = 30,
+                    pct.pago.anticipado = 0.1,
+                    pg = 0){
     
     
     pago.anticipado <- -pmt(r = tasa.descuento.ice,
-                            n = n.canon,
+                            n = n.canon - pg,
                             pv = valor,
                             fv = 0)*n.canon*pct.pago.anticipado
     
     valor <- valor*(1 - pct.pago.anticipado)
     pago <- -pmt(r = tasa.descuento.ice,
-                 n = n.canon,
+                 n = n.canon - pg,
                  pv = valor,
                  fv = 0)
     res <- data.frame(pago = pago, pago.anticipado = pago.anticipado)
@@ -434,7 +435,8 @@ pct.pago.anticipado = 0.15
     map2(costos.sistema11, left_join, by = "Año") %>%
     map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y) %>%
     map(select, -Inversion, -Royalty, -Ingresos.Brutos, -IVAxCobrar.x, -IVAxCobrar.y, -Costos ) %>% 
-    map(mutate, IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
+    map(mutate, 
+        IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
         IVA.aux2 = IVAxCobrar - IVAxPagar,
         IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) 
 
@@ -443,7 +445,8 @@ pct.pago.anticipado = 0.15
     map2(costos.elemento11, left_join, by = "Año") %>%
     map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y) %>%
     map(select, -Inversion, -Royalty, -Ingresos.Brutos, -IVAxCobrar.x, -IVAxCobrar.y, -Costos ) %>% 
-    map(mutate, IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
+    map(mutate, 
+        IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
         IVA.aux2 = IVAxCobrar - IVAxPagar,
         IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) %>% 
     map(select, -contains("aux"))
@@ -648,20 +651,38 @@ pct.pago.anticipado = 0.15
 # Calculo de canones Concesión e Infraestructura-------------------------------------------------
 
 ### Calculo valor de concesion
-  
+pg <- 5  ## periodo de gracia
 concesion.completo <- valor.completo$vp.base %>%   
-    canon(tasa.descuento.ice = r.ice, n.canon = n.concesion.multi, pct.pago.anticipado = 0.15)
+    canon(tasa.descuento.ice = r.ice, 
+          n.canon = n.concesion.multi, 
+          pg = pg, 
+          pct.pago.anticipado = pct.pago.anticipado)
  
+concesion.completo$n <- n.concesion.multi  
+
 concesion.sistema  <-  valor.sistema$vp.base %>% 
-    canon(tasa.descuento.ice = r.ice, n.canon = c(n.concesion.poli,n.concesion.multi), pct.pago.anticipado = 0.15)
+    canon(tasa.descuento.ice = r.ice, 
+          n.canon = c(n.concesion.poli ,n.concesion.multi),
+          pg = pg,
+          pct.pago.anticipado = pct.pago.anticipado)
   
 concesion.sistema$Sistema <- valor.sistema$Sistema  
+concesion.sistema <- concesion.sistema %>% 
+  mutate(n = if_else(Sistema == "Energia", 
+                     n.concesion.poli, 
+                     n.concesion.multi))
 
 concesion.elemento <-  valor.elemento$vp.base %>% 
-    canon(tasa.descuento.ice = r.ice, n.canon = c(n.concesion.multi,n.concesion.poli,n.concesion.multi,n.concesion.multi), pct.pago.anticipado = 0.15)
+    canon(tasa.descuento.ice = r.ice, 
+          n.canon = c(n.concesion.multi,n.concesion.poli,n.concesion.multi,n.concesion.multi),
+          pg = pg,
+          pct.pago.anticipado = pct.pago.anticipado)
 
 concesion.elemento$Elemento <- valor.elemento$Elemento
-
+concesion.elemento <- concesion.elemento %>% 
+  mutate(n = if_else(Elemento == "Poliductos", 
+                     n.concesion.poli, 
+                     n.concesion.multi))
 
 
 ### Calculo uso infraestructuras
@@ -674,7 +695,12 @@ canon.infra.completo <- inversiones.sistema10 %>%
   summarize(Inversion = sum(Inversion)) %>% 
   .$Inversion %>% 
   npv(r = r.ice) %>% 
-  canon(tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = pct.pago.anticipado)
+  canon(tasa.descuento.ice = r.ice,
+        n.canon = n.concesion.multi,
+        pg = pg,
+        pct.pago.anticipado = pct.pago.anticipado)
+
+canon.infra.completo$n <- n.concesion.multi
 
 canon.infra.sistema <- inversiones.sistema10  %>% 
   map(filter, Componente == "Infraestructura") %>% 
@@ -684,9 +710,15 @@ canon.infra.sistema <- inversiones.sistema10  %>%
   bind_rows() %>% 
   gather(Sistema, Canon.ICE) %>% 
   .$Canon.ICE %>% 
-  canon(tasa.descuento.ice = r.ice, n.canon = c(30,50), pct.pago.anticipado = pct.pago.anticipado)
+  canon(tasa.descuento.ice = r.ice, 
+        n.canon = c(n.concesion.poli,n.concesion.multi),
+        pct.pago.anticipado = pct.pago.anticipado,
+        pg = pg)
 
 canon.infra.sistema$Sistema <- valor.sistema$Sistema  
+canon.infra.sistema <- canon.infra.sistema %>% 
+  mutate(n = if_else(Sistema == "Energia", n.concesion.poli, n.concesion.multi))
+
 
 canon.infra.elemento <- inversiones.elemento10  %>% 
   map(filter, Componente == "Infraestructura") %>% 
@@ -696,38 +728,118 @@ canon.infra.elemento <- inversiones.elemento10  %>%
   bind_rows() %>% 
   gather(Elemento, Canon.ICE) %>% 
   .$Canon.ICE %>% 
-  canon(tasa.descuento.ice = r.ice, n.canon = c(30,50), pct.pago.anticipado = pct.pago.anticipado)
+  canon(tasa.descuento.ice = r.ice, 
+        n.canon = c(n.concesion.multi,
+                   n.concesion.poli,
+                   n.concesion.multi,
+                   n.concesion.multi), 
+        pct.pago.anticipado = pct.pago.anticipado, 
+        pg = pg)
 
 canon.infra.elemento$Elemento <- valor.elemento$Elemento
 
-#### Prueba para crear df "costos.adicionales" que usare para la evaluacion de fen para sistema y un tercero 
-concesion.completo
-costos.adicionales <- data.frame(Año = numeric(n.concesion.multi),
-                                 Anticipo.Concesion = numeric(n.concesion.multi),
-                                 Pago.Concesion = numeric(n.concesion.multi) )
+canon.infra.elemento <- canon.infra.elemento %>% 
+  mutate(n = if_else(Elemento == "Poliductos", n.concesion.poli, n.concesion.multi))
 
-costos.adicionales[1,] <- c(2012, concesion.completo$pago.anticipado, 0)
-costos.adicionales$Año <- seq(1:n.concesion.multi) + 2012 - 1
-costos.adicionales$Pago.Concesion[2:n.concesion.multi] <- concesion.completo$pago
-costos.adicionales <- costos.adicionales %>% 
-  mutate(IVAxCobrar = (Anticipo.Concesion + Pago.Concesion)*0.12)
+#### Funcion que crea df "costos.adicionales" que usare para la evaluacion de fen para sistema y un tercero 
 
-concesion.sistema
-concesion.elemento
-canon.infra.completo
-canon.infra.sistema
-canon.infra.elemento
+calcular.costos.adicionales <- function(df, nombre, pg){
+  costos.adicionales <- data.frame(Año = numeric(df$n),
+                                      Anticipo = numeric(df$n),
+                                      Pago = numeric(df$n))
+  costos.adicionales[1,] <- c(2012, df$pago.anticipado, 0)
+  costos.adicionales$Año <- seq(1:df$n) + 2012 - 1
+  costos.adicionales$Año <- costos.adicionales$Año %>% as.factor()
+  if (pg == 0) {
+  costos.adicionales$Pago[2:df$n] <- df$pago
+  } else{
+  costos.adicionales$Pago[2:(2 + pg)] <- 0
+  costos.adicionales$Pago[(3 + pg):df$n] <- df$pago
+  }
+  costos.adicionales <- costos.adicionales %>% 
+    mutate(IVAxCobrar = (Anticipo + Pago)*0.12)
+  names(costos.adicionales)[2:3] <- paste0(names(costos.adicionales)[2:3],".",nombre)
+  costos.adicionales
+  }
 
+### Data Frames costos adicionales para cada nivel
+
+valores.concesion.completo <- calcular.costos.adicionales(concesion.completo, "concesion", pg = pg)
+valores.canon.infr.completo <- calcular.costos.adicionales(canon.infra.completo, "canon.infra", pg = pg)
+
+valores.concesion.sistema <- concesion.sistema %>% 
+  split(.$Sistema) %>% 
+  map(calcular.costos.adicionales, "concesion", pg = pg)
+
+valores.canon.infr.sistema <- canon.infra.sistema %>% 
+  split(.$Sistema) %>% 
+  map(calcular.costos.adicionales, "canon.infra", pg = pg)
+
+valores.concesion.elemento <- concesion.elemento %>% 
+  split(.$Elemento) %>% 
+  map(calcular.costos.adicionales, "concesion", pg = pg)
+
+valores.canon.infr.elemento <- canon.infra.elemento %>% 
+  split(.$Elemento) %>% 
+  map(calcular.costos.adicionales, "canon.infra", pg = pg)
+
+
+# Separacion costos e inversiones 3ro -------------------------------------
+
+### Separacion de costos e inversiones de 3ro y propios
 costos.sistema.3ro <- costos.sistema10 %>% 
-  map(filter, Componente != "Infraestructura")
+  map(filter, Componente != "Infraestructura") %>% 
+  map(group_by, Año) %>%
+  map(summarise_each, "sum", -Componente)
+
 inversiones.sistema.3ro <- inversiones.sistema10 %>% 
-  map(filter, Componente != "Infraestructura")
+  map(filter, Componente != "Infraestructura") %>% 
+  map(group_by, Año) %>%
+  map(summarise_each, "sum", -Componente)
+
+costos.sistema.3ro <- costos.sistema.3ro %>% 
+  map2(valores.concesion.sistema, left_join, by = "Año") %>% 
+  map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
+      Costos = Costos + Anticipo.concesion + Pago.concesion) %>% 
+  map(select, -IVAxCobrar.x, -IVAxCobrar.y, -Anticipo.concesion, -Pago.concesion) %>% 
+  map2(valores.canon.infr.sistema, left_join, by = "Año") %>% 
+  map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
+      Costos = Costos + Anticipo.canon.infra + Pago.canon.infra) %>% 
+  map(select, -IVAxCobrar.x, -IVAxCobrar.y, -Anticipo.canon.infra, -Pago.canon.infra)
+  
 
 
+costos.elemento.3ro <- costos.elemento10 %>% 
+  map(filter, Componente != "Infraestructura") %>% 
+  map(group_by, Año) %>%
+  map(summarise_each, "sum", -Componente)
+
+inversiones.elemento.3ro <- inversiones.elemento10 %>% 
+  map(filter, Componente != "Infraestructura") %>% 
+  map(group_by, Año) %>%
+  map(summarise_each, "sum", -Componente)
+
+costos.elemento.3ro <- costos.elemento.3ro %>% 
+  map2(valores.concesion.elemento, left_join, by = "Año") %>% 
+  map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
+      Costos = Costos + Anticipo.concesion + Pago.concesion) %>% 
+  map(select, -IVAxCobrar.x, -IVAxCobrar.y, -Anticipo.concesion, -Pago.concesion) %>% 
+  map2(valores.canon.infr.elemento, left_join, by = "Año") %>% 
+  map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
+      Costos = Costos + Anticipo.canon.infra + Pago.canon.infra) %>% 
+  map(select, -IVAxCobrar.x, -IVAxCobrar.y, -Anticipo.canon.infra, -Pago.canon.infra)
+
+
+#### Calculo de costos propios falta la inclusion de gastos propios
 costos.sistema.propios <- costos.sistema10 %>% 
-  map(filter, Componente == "Infraestructura")
+  map(filter, Componente == "Infraestructura")  %>% 
+  map(group_by, Año) %>%
+  map(summarise_each, "sum", -Componente) 
 
-costos.sistema.propios
+inversiones.sistema.propios <- inversiones.sistema10 %>% 
+  map(filter, Componente == "Infraestructura") %>% 
+  map(group_by, Año) %>%
+  map(summarise_each, "sum", -Componente)
 
 
   # df <- df.sistema11$Multimodal
