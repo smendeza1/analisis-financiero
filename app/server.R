@@ -674,5 +674,6 @@ server <- shinyServer( function(input, output) {
   })
 output$total <- renderDataTable({r()[[1]]})
 output$sistema <- renderDataTable({r()[[2]]})  
+output$elemento <- renderDataTable({r()[[3]]})  
 }
 )
