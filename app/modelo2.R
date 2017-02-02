@@ -567,6 +567,7 @@ pct.pago.anticipado = 0.15
   ### Funciones que calculan vpn base y de financiamiento respectivamente
   calcular_fen <- function(df,r,horizonte = 2062, res = 1, regimen.fiscal = FALSE){
     
+    
     df$regimen.fiscal <- regimen.fiscal
     df <-  df %>% 
       mutate(IVA.Neto = if_else(IVA.Neto > 0,0,IVA.Neto),
@@ -578,17 +579,20 @@ pct.pago.anticipado = 0.15
              # - Pago
              + IVA.Neto,
              Año = as.numeric(Año)) %>% 
-      filter(Año <= horizonte)
+      filter(Año <= horizonte) %>% 
+      arrange(Año)
     
+    irr_safe <- safely(irr)
     flujo.base <- sum(df$FEN)
     vp.base <- npv(r = r, cf = df$FEN)
-    tir <- irr(df$FEN)
+    tir <- ifelse(is.null(irr_safe(df$FEN)$result), NA, irr_safe(df$FEN)$result)
     
     if (res == 1) {
       res <- data.frame(flujo.base, vp.base, tir)
     } else {
       df
     }
+    
   }
   calcular_vpnf <- function(df,r,horizonte = 2062, res = 1, regimen.fiscal = FALSE,
                             pct.financiado = pct.financiado){
@@ -690,8 +694,6 @@ concesion.elemento <- concesion.elemento %>%
 canon.infra.completo <- inversiones.sistema10 %>% 
   bind_rows(.id = "Sistema") %>% 
   filter(Componente == "Infraestructura") %>% 
-  select(Sistema, Año, Inversion) %>% 
-  group_by(Año) %>% 
   summarize(Inversion = sum(Inversion)) %>% 
   .$Inversion %>% 
   npv(r = r.ice) %>% 
@@ -740,6 +742,8 @@ canon.infra.elemento$Elemento <- valor.elemento$Elemento
 
 canon.infra.elemento <- canon.infra.elemento %>% 
   mutate(n = if_else(Elemento == "Poliductos", n.concesion.poli, n.concesion.multi))
+
+
 
 #### Funcion que crea df "costos.adicionales" que usare para la evaluacion de fen para sistema y un tercero 
 
@@ -832,7 +836,7 @@ costos.elemento.3ro <- costos.elemento.3ro %>%
   map(select, -IVAxCobrar.x, -IVAxCobrar.y, -Anticipo.canon.infra, -Pago.canon.infra)
 
 
-#### Calculo de costos propios falta la inclusion de gastos propios
+#### Calculo de ingresos y costos propios
 
 ingresos.sistema.propios <- map2(ingresos.sistema11, valores.concesion.sistema, full_join, by = "Año") %>% 
   map2(valores.canon.infr.sistema, left_join, by = "Año") %>% 
@@ -842,7 +846,9 @@ ingresos.sistema.propios <- map2(ingresos.sistema11, valores.concesion.sistema, 
   map(mutate, Ingresos.Brutos = Royalty + Anticipo.concesion + Anticipo.canon.infra +
       Pago.concesion + Pago.canon.infra) %>% 
   map(select, Año, Ingresos.Brutos) %>% 
-  map(mutate, IVAxPagar = Ingresos.Brutos*0.12)
+  map(mutate, IVAxPagar = Ingresos.Brutos*0.12,
+      Año = as.numeric(as.character(Año))) %>% 
+  map(arrange, Año)
 
 ingresos.elemento.propios <- map2(ingresos.elemento11, valores.concesion.elemento, full_join, by = "Año") %>% 
   map2(valores.canon.infr.elemento, left_join, by = "Año") %>% 
@@ -852,15 +858,20 @@ ingresos.elemento.propios <- map2(ingresos.elemento11, valores.concesion.element
   map(mutate, Ingresos.Brutos = Royalty + Anticipo.concesion + Anticipo.canon.infra +
         Pago.concesion + Pago.canon.infra) %>% 
   map(select, Año, Ingresos.Brutos) %>% 
-  map(mutate, IVAxPagar = Ingresos.Brutos*0.12)
+  map(mutate, IVAxPagar = Ingresos.Brutos*0.12,
+      Año = as.numeric(as.character(Año))) %>% 
+  map(arrange, Año)
 
 
 costos.sistema.propios <- costos.sistema10 %>% 
   map(filter, Componente == "Infraestructura")  %>% 
   map(group_by, Año) %>%
-  map(summarise_each, "sum", -Componente) 
+  map(summarise_each, "sum", -Componente) %>% 
+  map(ungroup) %>% 
+  map(mutate, Año = as.numeric(as.character(Año)))
 
-costos.sistema.propios <- map2(costos.sistema.propios, ingresos.sistema.propios, left_join) %>% 
+costos.sistema.propios <- map2(costos.sistema.propios, ingresos.sistema.propios, full_join) %>%
+  map(replace_na, list(Costos = 0, IVAxCobrar = 0)) %>% 
   map(mutate, Gastos.comerc = pct.gastos.comercializacion*Ingresos.Brutos,
       Costos = Costos + Gastos.comerc,
       IVAxCobrar = Costos*0.12) %>% 
@@ -869,14 +880,19 @@ costos.sistema.propios <- map2(costos.sistema.propios, ingresos.sistema.propios,
 inversiones.sistema.propios <- inversiones.sistema10 %>% 
   map(filter, Componente == "Infraestructura") %>% 
   map(group_by, Año) %>%
-  map(summarise_each, "sum", -Componente)
+  map(summarise_each, "sum", -Componente) %>% 
+  map(ungroup) %>% 
+  map(mutate, Año = as.numeric(as.character(Año)))
 
 costos.elemento.propios <- costos.elemento10 %>% 
   map(filter, Componente == "Infraestructura")  %>% 
   map(group_by, Año) %>%
-  map(summarise_each, "sum", -Componente) 
+  map(summarise_each, "sum", -Componente) %>% 
+  map(ungroup) %>% 
+  map(mutate, Año = as.numeric(as.character(Año)))
 
-costos.elemento.propios <- map2(costos.elemento.propios, ingresos.elemento.propios, left_join) %>% 
+costos.elemento.propios <- map2(costos.elemento.propios, ingresos.elemento.propios, full_join) %>% 
+  map(replace_na,  list(Costos = 0, IVAxCobrar = 0)) %>% 
   map(mutate, Gastos.comerc = pct.gastos.comercializacion*Ingresos.Brutos,
       Costos = Costos + Gastos.comerc,
       IVAxCobrar = Costos*0.12) %>% 
@@ -885,9 +901,11 @@ costos.elemento.propios <- map2(costos.elemento.propios, ingresos.elemento.propi
 inversiones.elemento.propios <- inversiones.elemento10 %>% 
   map(filter, Componente == "Infraestructura") %>% 
   map(group_by, Año) %>%
-  map(summarise_each, "sum", -Componente)
+  map(summarise_each, "sum", -Componente) %>% 
+  map(ungroup) %>% 
+  map(mutate, Año = as.numeric(as.character(Año)))
 
-costos.elemento.propios
+
 
 # Financiamiento 3ro y propio ----------------------------------------------
 
@@ -907,48 +925,123 @@ financiamiento.elemento.3ro <- inversiones.elemento.3ro %>%
       r = r)
 
 
-financiamiento.sistema.propio <- inversiones.sistema.propios
+financiamiento.sistema.propios <- inversiones.sistema.propios %>% 
+  map2(ingresos.sistema.propios, left_join) %>% 
+  map(amortizacion,
+      pct.financiado = pct.financiado,
+      n = n,
+      r = r)  %>% 
+  map(ungroup) %>% 
+  map(mutate, Año = as.numeric(as.character(Año)))
+
+
+financiamiento.elemento.propios <- inversiones.elemento.propios %>% 
+  map2(ingresos.elemento.propios, left_join) %>% 
+  map(amortizacion,
+      pct.financiado = pct.financiado,
+      n = n,
+      r = r) %>% 
+  map(ungroup) %>% 
+  map(mutate, Año = as.numeric(as.character(Año)))
+
 
 # IVA 3ro y propios -------------------------------------------------------
 
-impuestos.sistema.3ro <- map2(ingresos.sistema11, inversiones)
-
-
-
-Impuestos.sistema11 <- map2(ingresos.sistema11,inversiones.sistema11,left_join) %>%
-  map2(costos.sistema11, left_join, by = "Año") %>%
-  map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y) %>%
-  map(select, -Inversion, -Royalty, -Ingresos.Brutos, -IVAxCobrar.x, -IVAxCobrar.y, -Costos ) %>% 
-  map(mutate, 
+impuestos.sistema.3ro <- map2(ingresos.sistema11, inversiones.sistema.3ro, left_join) %>% 
+  map2(costos.sistema.3ro, left_join, by = "Año") %>% 
+  map(select, -Inversion, -Royalty, -Ingresos.Brutos, -Costos ) %>% 
+  map(mutate,
+      IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
       IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
       IVA.aux2 = IVAxCobrar - IVAxPagar,
-      IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) 
+      IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) %>% 
+  map(select, -IVAxCobrar.x, -IVAxCobrar.y)
 
-  # df <- df.sistema11$Multimodal
-  # primer.año <- df$Año %>% as.numeric() %>% min()
-  # df$Año <- df$Año %>% as.numeric()
-  # tmp.valor <- valor.sistema$vp.total[valor.sistema$Sistema == "Multimodal"]
-  # tmp.canon <- canon(valor = tmp.valor, tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = 0.15)
-  # 
-  # df$Anticipo.Concesion <- 0
-  # df$Anticipo.Concesion[df$Año == primer.año] <- tmp.canon$pago.anticipado
-  # 
-  # tmp.años <- primer.año + seq(1:50)
-  # df$Concesion <- 0
-  # 
-  # df$Concesion[df$Año %in% tmp.años] <- tmp.canon$pago
-  # 
-  # tmp.inv <- inversiones.sistema10$Multimodal %>% 
-  #   filter(Componente != "Superestructura") %>% 
-  #   spread(Componente, Inversion) %>% 
-  #   ungroup()
-  # 
-  # tmp.valor <-  npv(r = 0.04, cf = tmp.inv$Infraestructura)
-  # tmp.canon <- canon(valor = tmp.valor, tasa.descuento.ice = r.ice, n.canon = 50, pct.pago.anticipado = 0.15)
-  # 
-  # df$Anticipo.Canon.Infra <- 0
-  # df$Anticipo.Canon.Infra[df$Año == primer.año] <- tmp.canon$pago.anticipado
-  # df$Infra[df$Año %in% tmp.años] <- tmp.canon$pago
-  # 
-  # costos.sistema10$Multimodal$Componente %>% unique()
-  # 
+
+impuestos.elemento.3ro <- map2(ingresos.elemento11, inversiones.elemento.3ro, left_join) %>% 
+  map2(costos.elemento.3ro, left_join, by = "Año") %>% 
+  map(select, -Inversion, -Royalty, -Ingresos.Brutos, -Costos ) %>% 
+  map(mutate,
+      IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
+      IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
+      IVA.aux2 = IVAxCobrar - IVAxPagar,
+      IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) %>% 
+  map(select, -IVAxCobrar.x, -IVAxCobrar.y)
+
+
+
+impuestos.sistema.propios <- map2(ingresos.sistema.propios, inversiones.sistema.propios, left_join) %>% 
+  map2(costos.sistema.propios, left_join, by = "Año") %>% 
+  map(select, -Inversion, -Ingresos.Brutos, -Costos ) %>% 
+  map(mutate,
+      IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
+      IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
+      IVA.aux2 = IVAxCobrar - IVAxPagar,
+      IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) %>% 
+  map(select, -IVAxCobrar.x, -IVAxCobrar.y)
+
+impuestos.elemento.propios <- map2(ingresos.elemento.propios, inversiones.elemento.propios, left_join) %>% 
+  map2(costos.elemento.propios, left_join, by = "Año") %>% 
+  map(select, -Inversion, -Royalty, -Ingresos.Brutos, -Costos ) %>% 
+  map(mutate,
+      IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
+      IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
+      IVA.aux2 = IVAxCobrar - IVAxPagar,
+      IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) %>% 
+  map(select, -IVAxCobrar.x, -IVAxCobrar.y)
+
+
+
+# Calculo VPN escenario 10  ------------------------------------------------------------
+
+### Creación de data frames que sirven de input para el calculo del VP base del 
+### proyecto y VP del financiamiento en las modalidades: 
+### Sistema completo, portipo de sistema y por elemento del sistema
+df.sistema.3ro <- ingresos.sistema11 %>%
+  map2(costos.sistema.3ro, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(inversiones.sistema.3ro, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(financiamiento.sistema.3ro, full_join) %>%
+  map(select, -Saldo, -Amortizacion) %>%
+  map2(impuestos.sistema.3ro, full_join) %>%
+  map(select, -contains("IVAx")) %>%
+  map(replace_na, replace = list(Ingresos.Brutos = 0,
+                                 Royalty = 0,
+                                 ISR = 0,
+                                 Costos = 0,
+                                 Inversion = 0,
+                                 Pago = 0,
+                                 IVA.Neto = 0,
+                                 Intereses = 0))
+
+
+df.sistema.propios <- ingresos.sistema.propios %>%
+  map2(costos.sistema.propios, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(inversiones.sistema.propios, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(financiamiento.sistema.propios, full_join) %>%
+  map(select, -Saldo, -Amortizacion) %>%
+  map2(impuestos.sistema.propios, full_join) %>%
+  map(select, -contains("IVAx")) %>% 
+  map(mutate, ISR = Ingresos.Brutos*isr) %>% 
+  map(arrange, Año) 
+  
+
+df.sistema.propios <- df.sistema.propios %>% 
+  map(replace_na, list(Ingresos.Brutos = 0,
+                       Costos = 0,
+                       Inversion = 0,
+                       Intereses = 0,
+                       Pago = 0,
+                       IVA.Neto = 0))
+
+
+df.sistema.3ro %>% map(calcular_fen,r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
+df.sistema.propios %>% map(calcular_fen,r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
+
+
+
+
+
