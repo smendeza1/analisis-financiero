@@ -83,7 +83,11 @@ ui <- navbarPage(
              mainPanel(tabsetPanel(
                tabPanel("VPN Proyecto", dataTableOutput("total")),
                tabPanel("VPN por Sistema", dataTableOutput("sistema")),
-               tabPanel("VPN por Elemento", dataTableOutput("elemento"))
+               tabPanel("VPN por Elemento", dataTableOutput("elemento")),
+               tabPanel("VPN Tercero, Sistema", dataTableOutput("tercero.sistema")),
+               tabPanel("VPN Tercero, Elemento", dataTableOutput("tercero.elemento")),
+               tabPanel("VPN SIGSA, Sistema", dataTableOutput("sigsa.sistema")),
+               tabPanel("VPN SIGSA, Elemento", dataTableOutput("sigsa.elemento"))
              ))
            ))
 )

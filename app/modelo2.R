@@ -32,6 +32,7 @@ split.puertos     = 0.5
 pct.royalty       = 0.05
 pct.gastos.comercializacion = 0.025
 pct.pago.anticipado = 0.15
+pg                = 4  ## periodo de gracia canon
 
 
 # Leyendas data frame -----------------------------------------------------
@@ -655,7 +656,7 @@ pct.pago.anticipado = 0.15
 # Calculo de canones Concesión e Infraestructura-------------------------------------------------
 
 ### Calculo valor de concesion
-pg <- 5  ## periodo de gracia
+
 concesion.completo <- valor.completo$vp.base %>%   
     canon(tasa.descuento.ice = r.ice, 
           n.canon = n.concesion.multi, 
@@ -982,7 +983,7 @@ impuestos.sistema.propios <- map2(ingresos.sistema.propios, inversiones.sistema.
 
 impuestos.elemento.propios <- map2(ingresos.elemento.propios, inversiones.elemento.propios, left_join) %>% 
   map2(costos.elemento.propios, left_join, by = "Año") %>% 
-  map(select, -Inversion, -Royalty, -Ingresos.Brutos, -Costos ) %>% 
+  map(select, -Inversion, -Ingresos.Brutos, -Costos ) %>% 
   map(mutate,
       IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
       IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
@@ -1026,10 +1027,7 @@ df.sistema.propios <- ingresos.sistema.propios %>%
   map2(impuestos.sistema.propios, full_join) %>%
   map(select, -contains("IVAx")) %>% 
   map(mutate, ISR = Ingresos.Brutos*isr) %>% 
-  map(arrange, Año) 
-  
-
-df.sistema.propios <- df.sistema.propios %>% 
+  map(arrange, Año) %>% 
   map(replace_na, list(Ingresos.Brutos = 0,
                        Costos = 0,
                        Inversion = 0,
@@ -1038,10 +1036,53 @@ df.sistema.propios <- df.sistema.propios %>%
                        IVA.Neto = 0))
 
 
-df.sistema.3ro %>% map(calcular_fen,r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
-df.sistema.propios %>% map(calcular_fen,r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
+df.elemento.3ro <- ingresos.elemento11 %>%
+  map2(costos.elemento.3ro, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(inversiones.elemento.3ro, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(financiamiento.elemento.3ro, full_join) %>%
+  map(select, -Saldo, -Amortizacion) %>%
+  map2(impuestos.elemento.3ro, full_join) %>%
+  map(select, -contains("IVAx")) %>%
+  map(replace_na, replace = list(Ingresos.Brutos = 0,
+                                 Royalty = 0,
+                                 ISR = 0,
+                                 Costos = 0,
+                                 Inversion = 0,
+                                 Pago = 0,
+                                 IVA.Neto = 0,
+                                 Intereses = 0))
 
+df.elemento.propios  <- ingresos.elemento.propios %>%
+  map2(costos.elemento.propios, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(inversiones.elemento.propios, full_join) %>%
+  map(select, -contains("IVA")) %>%
+  map2(financiamiento.elemento.propios, full_join) %>%
+  map(select, -Saldo, -Amortizacion) %>%
+  map2(impuestos.elemento.propios, full_join) %>%
+  map(select, -contains("IVAx")) %>% 
+  map(mutate, ISR = Ingresos.Brutos*isr) %>% 
+  map(arrange, Año) %>% 
+  map(replace_na, list(Ingresos.Brutos = 0,
+                       Costos = 0,
+                       Inversion = 0,
+                       Intereses = 0,
+                       Pago = 0,
+                       IVA.Neto = 0))
 
+valor.sistema.10.3ro <-  df.sistema.3ro %>% map(calcular_fen,r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
+valor.elemento.10.3ro <- df.elemento.3ro %>% map(calcular_fen,r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
+valor.sistema.10.propio <- df.sistema.propios %>% map(calcular_fen, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
+valor.elemento.10.propio <- df.elemento.propios %>% map(calcular_fen,r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
 
+valor.3ro <- list(valor.sistema.10 = valor.sistema.10.3ro %>% bind_rows(.id = "Sistema"),
+     valor.elemento.10 = valor.elemento.10.3ro %>% bind_rows(.id = "Elemento"))
+
+valor.SIGSA <- list(valor.sistema.10 = valor.sistema.10.propio %>% bind_rows(.id = "Sistema"),
+     valor.elemento.10 = valor.elemento.10.propio %>% bind_rows(.id = "Elemento"))
+
+lista <- list(resultado, valor.3ro, valor.SIGSA)
 
 
