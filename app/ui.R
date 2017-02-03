@@ -4,11 +4,11 @@
 
 ui <- navbarPage(
   title = "Analisis Financiero",
-  inverse = FALSE,
+  inverse = TRUE,
   footer = div("  Elaborado por:  ", img(src = "axon2.png")),
   tabPanel("Valor Base",
            sidebarLayout(
-             sidebarPanel(
+             sidebarPanel(h3("Inputs para evaluacion del modelo"),
                sliderInput(
                  "años.financiamiento",
                  label = "Años financiamiento",
@@ -80,14 +80,22 @@ ui <- navbarPage(
                  step = 0.05
                )
              ),
-             mainPanel(tabsetPanel(
-               tabPanel("VPN Proyecto", dataTableOutput("total")),
+             mainPanel(h1("Evaluación Base"),
+                                  h2("Sistema Completo"),
+               tabPanel("VPN Proyecto completo", dataTableOutput("total")),
+               h2("VPN por sistema"),
                tabPanel("VPN por Sistema", dataTableOutput("sistema")),
+               h2("VPN por elemento"),
                tabPanel("VPN por Elemento", dataTableOutput("elemento")),
+               h1("Evaluación construcción Infraestructura por parte de SIGSA"),
+               h2("VPN 3ro por sistema"),
                tabPanel("VPN Tercero, Sistema", dataTableOutput("tercero.sistema")),
+               h2("VPN 3ro por elemento"),
                tabPanel("VPN Tercero, Elemento", dataTableOutput("tercero.elemento")),
+               h2("VPN SIGSA por Sistema"),
                tabPanel("VPN SIGSA, Sistema", dataTableOutput("sigsa.sistema")),
+               h2("VPN SIGSA por Elemento"),
                tabPanel("VPN SIGSA, Elemento", dataTableOutput("sigsa.elemento"))
-             ))
+             )
            ))
 )
