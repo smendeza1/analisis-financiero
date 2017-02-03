@@ -645,13 +645,18 @@ pg                = 4  ## periodo de gracia canon
     mutate(vp.total = vp.base + vp.fin)
   
   
-  valor.completo$vp.total %>% formattable::currency()
   
   resultado <- list(Completo = valor.completo, 
                     Sistema  = valor.sistema, 
                     Elemento = valor.elemento)
   
-
+  resultado <- resultado %>% 
+    map(select, -flujo.base, -flujo.fin) %>% 
+    map(mutate, 
+        vp.base = formattable::currency(vp.base, digits = 0),
+        vp.fin  = formattable::currency(vp.fin, digits = 0),
+        vp.total  = formattable::currency(vp.total, digits = 0),
+        tir = formattable::percent(tir))
 
 # Calculo de canones Concesión e Infraestructura-------------------------------------------------
 
@@ -1080,8 +1085,22 @@ valor.elemento.10.propio <- df.elemento.propios %>% map(calcular_fen,r = expecte
 valor.3ro <- list(valor.sistema.10 = valor.sistema.10.3ro %>% bind_rows(.id = "Sistema"),
      valor.elemento.10 = valor.elemento.10.3ro %>% bind_rows(.id = "Elemento"))
 
+valor.3ro <- valor.3ro %>% 
+  map(select, -flujo.base) %>% 
+  map(mutate, 
+      vp.base = formattable::currency(vp.base, digits = 0),
+      tir = formattable::percent(tir))
+
 valor.SIGSA <- list(valor.sistema.10 = valor.sistema.10.propio %>% bind_rows(.id = "Sistema"),
      valor.elemento.10 = valor.elemento.10.propio %>% bind_rows(.id = "Elemento"))
+
+
+valor.SIGSA <- valor.SIGSA %>% 
+  map(select, -flujo.base) %>% 
+  map(mutate, 
+      vp.base = formattable::currency(vp.base, digits = 0),
+      tir = formattable::percent(tir))
+
 
 lista <- list(resultado, valor.3ro, valor.SIGSA)
 

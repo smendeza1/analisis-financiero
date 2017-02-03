@@ -646,12 +646,20 @@ modelo.base <- function(n                 = 30,
   valor.elemento <- left_join(valor.elemento11, valor.elemento11.fin) %>% 
     mutate(vp.total = vp.base + vp.fin)
   
-  
-  
+
   
   resultado <- list(Completo = valor.completo, 
                     Sistema  = valor.sistema, 
                     Elemento = valor.elemento)
+  
+  resultado <- resultado %>% 
+    map(select, -flujo.base, -flujo.fin) %>% 
+    map(mutate, 
+        vp.base = formattable::currency(vp.base, digits = 0),
+        vp.fin  = formattable::currency(vp.fin, digits = 0),
+        vp.total  = formattable::currency(vp.total, digits = 0),
+        tir = formattable::percent(tir))
+  
   
   # Calculo de canones Concesión e Infraestructura-------------------------------------------------
   
@@ -1077,11 +1085,29 @@ modelo.base <- function(n                 = 30,
   valor.sistema.10.propio <- df.sistema.propios %>% map(calcular_fen, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
   valor.elemento.10.propio <- df.elemento.propios %>% map(calcular_fen,r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
   
+  
   valor.3ro <- list(valor.sistema.10 = valor.sistema.10.3ro %>% bind_rows(.id = "Sistema"),
                     valor.elemento.10 = valor.elemento.10.3ro %>% bind_rows(.id = "Elemento"))
   
+  valor.3ro <- valor.3ro %>% 
+    map(select, -flujo.base) %>% 
+    map(mutate, 
+        vp.base = formattable::currency(vp.base, digits = 0),
+        tir = formattable::percent(tir))
+  
   valor.SIGSA <- list(valor.sistema.10 = valor.sistema.10.propio %>% bind_rows(.id = "Sistema"),
                       valor.elemento.10 = valor.elemento.10.propio %>% bind_rows(.id = "Elemento"))
+  
+  
+  valor.SIGSA <- valor.SIGSA %>% 
+    map(select, -flujo.base) %>% 
+    map(mutate, 
+        vp.base = formattable::currency(vp.base, digits = 0),
+        tir = formattable::percent(tir))
+  
+  
+  lista <- list(resultado, valor.3ro, valor.SIGSA)
+  
   
   lista <- list(resultado, valor.3ro, valor.SIGSA)
   return(lista)
@@ -1110,12 +1136,53 @@ server <- shinyServer( function(input, output) {
                      Inversiones                 = Inversiones,
                      Ingresos.poliducto          = Ingresos.poliducto)
   })
-output$total <- renderDataTable({r()[[1]][[1]]})
-output$sistema <- renderDataTable({r()[[1]][[2]]})  
-output$elemento <- renderDataTable({r()[[1]][[3]]})
-output$tercero.sistema <- renderDataTable({r()[[2]][[1]]})
+output$total <- renderDataTable({
+  withProgress(message = 'Estructurando análisis base',
+               detail = 'VPN proyecto...', value = 0, {
+                 for (i in 1:15) {
+                   incProgress(1/5)
+                   Sys.sleep(0.02)
+                 }
+               })
+  r()[[1]][[1]]})
+output$sistema <- renderDataTable({
+  withProgress(message = 'Calculando:',
+               detail = 'VPN sistema...', value = 0, {
+                 for (i in 1:15) {
+                   incProgress(1/5)
+                   Sys.sleep(0.02)
+                 }
+               })
+  r()[[1]][[2]]})  
+output$elemento <- renderDataTable({
+  withProgress(message = 'Calculando:',
+               detail = 'VPN elemento...', value = 0, {
+                 for (i in 1:15) {
+                   incProgress(1/5)
+                   Sys.sleep(0.02)
+                 }
+               })
+  r()[[1]][[3]]})
+output$tercero.sistema <- renderDataTable({
+  withProgress(message = 'Calculando análisis infraestructura',
+               detail = 'VPNs 3ro...', value = 0, {
+                 for (i in 1:15) {
+                   incProgress(1/5)
+                   Sys.sleep(0.02)
+                 }
+               })
+  r()[[2]][[1]]})
 output$tercero.elemento <- renderDataTable({r()[[2]][[2]]})
-output$sigsa.sistema <- renderDataTable({r()[[3]][[1]]})
+output$sigsa.sistema <- renderDataTable({
+  withProgress(message = 'Calculando análisis infraestructura',
+               detail = 'VPNs SIGSA...', value = 0, {
+                 for (i in 1:15) {
+                   incProgress(1/5)
+                   Sys.sleep(0.15)
+                 }
+               })
+  
+  r()[[3]][[1]]})
 output$sigsa.elemento <- renderDataTable({r()[[3]][[2]]})
 
 }
