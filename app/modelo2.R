@@ -184,7 +184,7 @@ pg                = 5  ## periodo de gracia canon
   ingresos.sistema11 <- segmentar_ingreso(type = "Sistema")
   ingresos.elemento11 <- segmentar_ingreso(type = "Elemento")
   
-  ingresos.sistema11
+  primer.año <- Ingresos$Año %>% as.character( ) %>% as.numeric() %>% min()
   
   # Inversiones y canones de infraestructura y concesión -------------------------------------------------------------
   
@@ -617,17 +617,63 @@ pg                = 5  ## periodo de gracia canon
     }
   }
   
+  
+  ### Parametros del modelo
+  n.multi <- primer.año + n.concesion.multi
+  n.poli <- primer.año + n.concesion.poli
+  r.input <- list(expected.return)
+  horizonte.input <- list(n.multi)
+  res.input <- list(1)
+  regimen.fiscal.input <-  list(regimen.fiscal)
+  
+
+  params.completo <- list(df = list(df.sistema.completo11), r = r.input, horizonte = horizonte.input, res = res.input, regimen.fiscal = regimen.fiscal.input)
+  
+  data <- df.sistema11
+  horizonte.input <- list(n.poli, n.multi)
+  params.sistema <- list(df = data, r = r.input, horizonte = horizonte.input, res = res.input, regimen.fiscal = regimen.fiscal.input)
+  
+  data <- df.elemento11
+  horizonte.input <- list(n.multi, n.poli, n.multi, n.multi)
+  params.elemento <- list(df = data, r = r.input, horizonte = horizonte.input, res = res.input, regimen.fiscal = regimen.fiscal.input)
+  
+
   ### Calculo de vp base para cada modalidad
-  valor.sistema.completo <- calcular_fen(df.sistema.completo11, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
-  valor.sistema11 <- map(df.sistema11, calcular_fen,  r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal)
-  valor.elemento11 <- map(df.elemento11, calcular_fen,  r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal)
+  
+  valor.sistema.completo <- pmap(params.completo, calcular_fen)
+  valor.sistema11 <- pmap(params.sistema, calcular_fen)
+  valor.elemento11 <- pmap(params.elemento, calcular_fen)
+
   valor.sistema11 <- bind_rows(valor.sistema11, .id = "Sistema")
   valor.elemento11 <- bind_rows(valor.elemento11, .id = "Elemento")
   
+  ### Parametros para financiamiento 
+  
+  n.multi <- primer.año + n.concesion.multi
+  n.poli <- primer.año + n.concesion.poli
+  r.input <- list(r)
+  horizonte.input <- list(n.multi)
+  res.input <- list(1)
+  regimen.fiscal.input <-  list(regimen.fiscal)
+  
+  params.completo.fin <- list(df = list(df.sistema.completo11), r = r.input, horizonte = horizonte.input, res = res.input, regimen.fiscal = regimen.fiscal.input, pct.financiado = list(pct.financiado))
+  
+  data <- df.sistema11
+  horizonte.input <- list(n.poli, n.multi)
+  params.sistema.fin <- list(df = data, r = r.input, horizonte = horizonte.input, res = res.input, regimen.fiscal = regimen.fiscal.input, pct.financiado = list(pct.financiado))
+  
+  data <- df.elemento11
+  horizonte.input <- list(n.multi, n.poli, n.multi, n.multi)
+  params.elemento.fin <- list(df = data, r = r.input, horizonte = horizonte.input, res = res.input, regimen.fiscal = regimen.fiscal.input, pct.financiado = list(pct.financiado))
+  
+  
   ### Calculo de vp del financiamiento para cada modalidad
-  valor.sistema.completo.fin <- calcular_vpnf(df.sistema.completo11, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
-  valor.sistema11.fin <- map(df.sistema11, calcular_vpnf,  r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
-  valor.elemento11.fin <- map(df.elemento11, calcular_vpnf,  r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
+  
+  
+  
+  valor.sistema.completo.fin <- pmap(params.completo.fin, calcular_vpnf)
+  valor.sistema11.fin <- pmap(params.sistema.fin, calcular_vpnf)
+  valor.elemento11.fin <- pmap(params.elemento.fin, calcular_vpnf)
   valor.sistema11.fin <- bind_rows(valor.sistema11.fin, .id = "Sistema")
   valor.elemento11.fin <- bind_rows(valor.elemento11.fin, .id = "Elemento")
   
@@ -655,6 +701,8 @@ pg                = 5  ## periodo de gracia canon
         vp.fin  = formattable::currency(vp.fin, digits = 0),
         vp.total  = formattable::currency(vp.total, digits = 0),
         tir = formattable::percent(tir))
+  
+
 
 # Calculo de canones Concesión e Infraestructura-------------------------------------------------
 
@@ -1075,15 +1123,28 @@ df.elemento.propios  <- ingresos.elemento.propios %>%
                        Pago = 0,
                        IVA.Neto = 0))
 
-valor.sistema.10.3ro <-  df.sistema.3ro %>% map(calcular_fen, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
-valor.elemento.10.3ro <- df.elemento.3ro %>% map(calcular_fen, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
-valor.sistema.10.propio <- df.sistema.propios %>% map(calcular_fen, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
-valor.elemento.10.propio <- df.elemento.propios %>% map(calcular_fen,r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
+params.sistema$df <- df.sistema.3ro
+params.elemento$df <- df.elemento.3ro
+valor.sistema.10.3ro <-  pmap(params.sistema, calcular_fen)
+valor.elemento.10.3ro <- pmap(params.elemento, calcular_fen)
 
-valor.sistema.fin.3ro <- df.sistema.3ro %>% map(calcular_vpnf, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
-valor.elemento.fin.3ro <- df.elemento.3ro %>% map(calcular_vpnf, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
-valor.sistema.fin.propio <- df.sistema.propios %>% map(calcular_vpnf, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
-valor.elemento.fin.propio <- df.elemento.propios %>% map(calcular_vpnf, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
+params.sistema$df <- df.sistema.propios
+params.elemento$df <- df.elemento.propios
+valor.sistema.10.propio <- pmap(params.sistema, calcular_fen)
+valor.elemento.10.propio <- pmap(params.elemento, calcular_fen)
+
+params.sistema.fin$r <- list(r)
+params.elemento.fin$r <- list(r)
+params.sistema.fin$df <- df.sistema.3ro
+params.elemento.fin$df <- df.elemento.3ro
+
+valor.sistema.fin.3ro <- pmap(params.sistema.fin, calcular_vpnf)
+valor.elemento.fin.3ro <-  pmap(params.elemento.fin, calcular_vpnf)
+
+params.sistema.fin$df <- df.sistema.propios
+params.elemento.fin$df <- df.elemento.propios
+valor.sistema.fin.propio <- pmap(params.sistema.fin, calcular_vpnf)
+valor.elemento.fin.propio <- pmap(params.elemento.fin, calcular_vpnf)
 
 
 
