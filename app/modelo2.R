@@ -19,7 +19,7 @@ n                 = 30 # Tiempo financiamiento
 n.concesion.multi = 50
 n.concesion.poli  = 30
 r                 = 0.05 ## Tasa financiamiento
-r.ice             = 0.04 ## Tasa Canon Concesión
+r.ice             = 0.0777 ## Tasa Canon Concesión
 tasa.retorno.manual = FALSE
 tasa.descuento    = 0.08
 pct.financiado    = 0.6
@@ -32,7 +32,7 @@ split.puertos     = 0.5
 pct.royalty       = 0.05
 pct.gastos.comercializacion = 0.025
 pct.pago.anticipado = 0.15
-pg                = 4  ## periodo de gracia canon
+pg                = 5  ## periodo de gracia canon
 
 
 # Leyendas data frame -----------------------------------------------------
@@ -602,9 +602,7 @@ pg                = 4  ## periodo de gracia canon
     
     
     df <-  df %>% 
-      mutate(FEN = Inversion*pct.financiado
-             - Pago
-             + Intereses*isr2,
+      mutate(FEN = Inversion*pct.financiado - Pago + Intereses*isr2,
              Año = as.numeric(Año)) %>% 
       filter(Año <= horizonte) %>% 
       arrange(Año)
@@ -1077,31 +1075,52 @@ df.elemento.propios  <- ingresos.elemento.propios %>%
                        Pago = 0,
                        IVA.Neto = 0))
 
-valor.sistema.10.3ro <-  df.sistema.3ro %>% map(calcular_fen,r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
-valor.elemento.10.3ro <- df.elemento.3ro %>% map(calcular_fen,r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
+valor.sistema.10.3ro <-  df.sistema.3ro %>% map(calcular_fen, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
+valor.elemento.10.3ro <- df.elemento.3ro %>% map(calcular_fen, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
 valor.sistema.10.propio <- df.sistema.propios %>% map(calcular_fen, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
 valor.elemento.10.propio <- df.elemento.propios %>% map(calcular_fen,r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
 
-valor.3ro <- list(valor.sistema.10 = valor.sistema.10.3ro %>% bind_rows(.id = "Sistema"),
-     valor.elemento.10 = valor.elemento.10.3ro %>% bind_rows(.id = "Elemento"))
+valor.sistema.fin.3ro <- df.sistema.3ro %>% map(calcular_vpnf, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
+valor.elemento.fin.3ro <- df.elemento.3ro %>% map(calcular_vpnf, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
+valor.sistema.fin.propio <- df.sistema.propios %>% map(calcular_vpnf, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
+valor.elemento.fin.propio <- df.elemento.propios %>% map(calcular_vpnf, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
+
+
+
+valor.sistema.10  <- map2(valor.sistema.10.3ro, valor.sistema.fin.3ro, bind_cols) %>% 
+  bind_rows(.id = "Sistema")
+
+valor.elemento.10 <- map2(valor.elemento.10.3ro, valor.elemento.fin.3ro, bind_cols) %>% 
+  bind_rows(.id = "Elemento")
+
+valor.3ro <- list(valor.sistema.10, valor.elemento.10 )
 
 valor.3ro <- valor.3ro %>% 
-  map(select, -flujo.base) %>% 
+  map(select, -flujo.base, -flujo.fin) %>% 
   map(mutate, 
       vp.base = formattable::currency(vp.base, digits = 0),
+      vp.fin = formattable::currency(vp.fin, digits = 0),
+      vp.total = vp.base + vp.fin,
       tir = formattable::percent(tir))
 
-valor.SIGSA <- list(valor.sistema.10 = valor.sistema.10.propio %>% bind_rows(.id = "Sistema"),
-     valor.elemento.10 = valor.elemento.10.propio %>% bind_rows(.id = "Elemento"))
+
+valor.sistema.10.sigsa  <- map2(valor.sistema.10.propio, valor.sistema.fin.propio, bind_cols) %>% 
+  bind_rows(.id = "Sistema")
+
+valor.elemento.10.sigsa  <- map2(valor.elemento.10.propio, valor.elemento.fin.propio, bind_cols) %>% 
+  bind_rows(.id = "Elemento")
+
+
+valor.SIGSA <- list(valor.sistema.10.sigsa, valor.elemento.10.sigsa)
 
 
 valor.SIGSA <- valor.SIGSA %>% 
-  map(select, -flujo.base) %>% 
+  map(select, -flujo.base, -flujo.fin, -tir) %>% 
   map(mutate, 
       vp.base = formattable::currency(vp.base, digits = 0),
-      tir = formattable::percent(tir))
-
+      vp.fin = formattable::currency(vp.fin, digits = 0),
+      vp.total = vp.base + vp.fin)
 
 lista <- list(resultado, valor.3ro, valor.SIGSA)
-
+lista
 

@@ -1086,36 +1086,65 @@ modelo.base <- function(n                 = 30,
   valor.elemento.10.propio <- df.elemento.propios %>% map(calcular_fen,r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal )
   
   
-  valor.3ro <- list(valor.sistema.10 = valor.sistema.10.3ro %>% bind_rows(.id = "Sistema"),
-                    valor.elemento.10 = valor.elemento.10.3ro %>% bind_rows(.id = "Elemento"))
+  valor.sistema.fin.3ro <- df.sistema.3ro %>% map(calcular_vpnf, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
+  valor.elemento.fin.3ro <- df.elemento.3ro %>% map(calcular_vpnf, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
+  valor.sistema.fin.propio <- df.sistema.propios %>% map(calcular_vpnf, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
+  valor.elemento.fin.propio <- df.elemento.propios %>% map(calcular_vpnf, r = expected.return, horizonte = horizonte, res = 1, regimen.fiscal = regimen.fiscal, pct.financiado = pct.financiado)
+  
+  
+  
+  valor.sistema.10  <- map2(valor.sistema.10.3ro, valor.sistema.fin.3ro, bind_cols) %>% 
+    bind_rows(.id = "Sistema")
+  
+  valor.elemento.10 <- map2(valor.elemento.10.3ro, valor.elemento.fin.3ro, bind_cols) %>% 
+    bind_rows(.id = "Elemento")
+  
+  valor.3ro <- list(valor.sistema.10, valor.elemento.10 )
   
   valor.3ro <- valor.3ro %>% 
-    map(select, -flujo.base) %>% 
+    map(select, -flujo.base, -flujo.fin) %>% 
     map(mutate, 
         vp.base = formattable::currency(vp.base, digits = 0),
+        vp.fin = formattable::currency(vp.fin, digits = 0),
+        vp.total = vp.base + vp.fin,
         tir = formattable::percent(tir))
   
-  valor.SIGSA <- list(valor.sistema.10 = valor.sistema.10.propio %>% bind_rows(.id = "Sistema"),
-                      valor.elemento.10 = valor.elemento.10.propio %>% bind_rows(.id = "Elemento"))
+  
+  valor.sistema.10.sigsa  <- map2(valor.sistema.10.propio, valor.sistema.fin.propio, bind_cols) %>% 
+    bind_rows(.id = "Sistema")
+  
+  valor.elemento.10.sigsa  <- map2(valor.elemento.10.propio, valor.elemento.fin.propio, bind_cols) %>% 
+    bind_rows(.id = "Elemento")
+  
+  
+  valor.SIGSA <- list(valor.sistema.10.sigsa, valor.elemento.10.sigsa)
   
   
   valor.SIGSA <- valor.SIGSA %>% 
-    map(select, -flujo.base) %>% 
+    map(select, -flujo.base, -flujo.fin, -tir) %>% 
     map(mutate, 
         vp.base = formattable::currency(vp.base, digits = 0),
-        tir = formattable::percent(tir))
-  
-  
-  lista <- list(resultado, valor.3ro, valor.SIGSA)
-  
+        vp.fin = formattable::currency(vp.fin, digits = 0),
+        vp.total = vp.base + vp.fin)
   
   lista <- list(resultado, valor.3ro, valor.SIGSA)
+  
   return(lista)
 }
 
 
 server <- shinyServer( function(input, output) {
-  r <- reactive({modelo.base(n                           = input$años.financiamiento,
+  r <- reactive({
+    withProgress(message = 'Armando la función',
+                 detail = 'Resultados en un momento...', value = 0, {
+                   for (i in 1:15) {
+                     incProgress(1/5)
+                     Sys.sleep(0.2)
+                   }
+                 })
+    
+    
+    modelo.base(n                           = input$años.financiamiento,
                      r                           = input$tasa.financiamiento,
                      tasa.descuento              = input$tasa.descuento,
                      pct.financiado              = input$pct.financiado,
@@ -1137,13 +1166,7 @@ server <- shinyServer( function(input, output) {
                      Ingresos.poliducto          = Ingresos.poliducto)
   })
 output$total <- renderDataTable({
-  withProgress(message = 'Estructurando análisis base',
-               detail = 'VPN proyecto...', value = 0, {
-                 for (i in 1:15) {
-                   incProgress(1/5)
-                   Sys.sleep(0.02)
-                 }
-               })
+c
   r()[[1]][[1]]})
 output$sistema <- renderDataTable({
   withProgress(message = 'Calculando:',
