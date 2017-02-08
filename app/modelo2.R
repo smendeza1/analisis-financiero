@@ -453,7 +453,7 @@ pg                = 5  ## periodo de gracia canon
     map(select, -contains("aux"))
   
   
-  # Valorizacion ------------------------------------------------------------
+  r.ice# Valorizacion ------------------------------------------------------------
   
   ### Calculo de la tasa de retorno esperada
   
@@ -648,9 +648,6 @@ pg                = 5  ## periodo de gracia canon
   valor.elemento11 <- bind_rows(valor.elemento11, .id = "Elemento")
   
   ### Parametros para financiamiento 
-  
-  n.multi <- primer.año + n.concesion.multi
-  n.poli <- primer.año + n.concesion.poli
   r.input <- list(r)
   horizonte.input <- list(n.multi)
   res.input <- list(1)
@@ -803,8 +800,8 @@ calcular.costos.adicionales <- function(df, nombre, pg){
   costos.adicionales <- data.frame(Año = numeric(df$n),
                                       Anticipo = numeric(df$n),
                                       Pago = numeric(df$n))
-  costos.adicionales[1,] <- c(2012, df$pago.anticipado, 0)
-  costos.adicionales$Año <- seq(1:df$n) + 2012 - 1
+  costos.adicionales[1,] <- c(primer.año, df$pago.anticipado, 0)
+  costos.adicionales$Año <- seq(1:df$n) + primer.año - 1
   costos.adicionales$Año <- costos.adicionales$Año %>% as.factor()
   if (pg == 0) {
   costos.adicionales$Pago[2:df$n] <- df$pago
@@ -1133,8 +1130,8 @@ params.elemento$df <- df.elemento.propios
 valor.sistema.10.propio <- pmap(params.sistema, calcular_fen)
 valor.elemento.10.propio <- pmap(params.elemento, calcular_fen)
 
-params.sistema.fin$r <- list(r)
-params.elemento.fin$r <- list(r)
+params.sistema.fin$r <- list(expected.return)
+params.elemento.fin$r <- list(expected.return)
 params.sistema.fin$df <- df.sistema.3ro
 params.elemento.fin$df <- df.elemento.3ro
 
