@@ -17,11 +17,19 @@ ui <- navbarPage(
                  min = 5
                ),
                sliderInput(
-                 "horizonte",
-                 "Año final evaluación VPN",
-                 value = 2062,
-                 max = 2112,
-                 min = 2050,
+                 "cons.multi",
+                 "Periodo concesion Multimodal",
+                 value = 50,
+                 max = 70,
+                 min = 20,
+                 step = 2
+               ),
+               sliderInput(
+                 "cons.poli",
+                 "Periodo concesion Energia",
+                 value = 30,
+                 max = 70,
+                 min = 20,
                  step = 2
                ),
                sliderInput(
@@ -38,6 +46,13 @@ ui <- navbarPage(
                  min   = 0,
                  max = 1,
                  value = 0.6
+               ),
+               radioButtons(
+                 "tasa.retorno.manual",
+                 "Tasa de retorno",
+                 choices = list("Manual" = FALSE, "Automatica" =
+                                  TRUE),
+                 selected = TRUE
                ),
                sliderInput(
                  "tasa.descuento",
