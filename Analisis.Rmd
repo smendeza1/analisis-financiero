@@ -4,6 +4,8 @@ output:
   html_notebook: 
     theme: united
     toc: yes
+params:
+  tipo.demanda: "min"
 ---
 
 # Introducción
@@ -1571,3 +1573,44 @@ La valoración de SIGSA para cada sistema se puede observar en la tabla siguient
 La valoración del 3ro para esta modalidad de negociación es la siguiente:
 
 `r knitr::kable(valor.3ro.00$Sistema, col.names = c("Sistema", "VPN", "TIR"))`
+
+
+# Comparación de Escenarios
+
+A continuación realizaremos una comparación de los resultados obtenidos para cada escenario de negociación
+
+```{r, eval=FALSE, include=FALSE}
+
+resultado$Sistema$Negociacion <- "1er.escenario"
+valor.SIGSA.10$Sistema$Negociacion <- "2do.escenario"
+valor.SIGSA.00$Sistema$Negociacion <- "3er.escenario"
+
+valores.sistema <- bind_rows(resultado$Sistema, valor.SIGSA.10$Sistema, valor.SIGSA.00$Sistema)
+valores.sistema$Interesado <- "SIGSA"
+
+
+valor.3ro.10$Sistema$Negociacion <- "2do.escenario"
+valor.3ro.00$Sistema$Negociacion <- "3er.escenario"
+valores.3ro <- bind_rows(valor.3ro.10$Sistema, valor.3ro.00$Sistema)
+valores.3ro$Interesado <- "3ro"
+
+valores.analisis <- bind_rows(valores.sistema, valores.3ro)
+
+
+valores.analisis %>% 
+  ggplot(aes(x = Sistema, y = vp.base, fill = Interesado)) +
+  geom_col(position = "fill") +
+  facet_wrap(~ Negociacion) +
+  theme_axon()
+
+
+valores.analisis %>% 
+  ggplot(aes(x = Sistema, y = vp.base, fill = Interesado)) +
+  geom_col(position = "dodge") +
+  facet_grid(Sistema~ Negociacion)
+
+
+
+
+```
+
