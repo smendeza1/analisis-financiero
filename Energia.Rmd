@@ -1,6 +1,8 @@
 ---
 title: "Analisis financiero"
-output: html_notebook
+output:
+  html_notebook: default
+  html_document: default
 ---
 
 # Introducción
@@ -95,10 +97,10 @@ isr               = 0.07
 isr2              = 0.25
 horizonte         = 2062
 regimen.fiscal    = TRUE ## en donde FALSE indica regimen sobre ingresos
-split.puertos     = 0.5
+split.puertos     = 0.50
 pct.royalty       = 0.05
 pct.gastos.comercializacion = 0.025
-pct.pago.anticipado = 0.05
+pct.pago.anticipado = 0.051
 pg                = 1  ## periodo de gracia canon
 
 ```
@@ -1391,26 +1393,40 @@ Esto nos da un valor de retorno esperado (Costo de Capital) que se puede ver en 
 
 ## Porcentajes
 
-**Porcentaje pago anticipado canones**, este valor se establece en un 5% del valor total de la concesión
+**Porcentaje pago anticipado canones**, este valor se establece en un `r percent(pct.pago.anticipado)`del valor total de la concesión.
+
 **Porcentaje Royalty**, este se estima en un 5% del valor de los ingresos.
 
 
 # Valorización Sistema Energia
 
-En este caso se valorizará la 3ra modalidad de negociación. En este caso el valor que representa este negocio a un tercero es de `r dollar(valor.sistema.00.3ro$Energia$vp.base*1e-6)` billones, con una TIR de `r percent(valor.sistema.00.3ro$Energia$tir)`
+```{r}
+tabla <- concesion.sistema %>% filter(Sistema == "Energia") %>% 
+  select(-Sistema) %>% 
+  mutate(pago = dollar(pago),
+         pago.anticipado = dollar(pago.anticipado))
 
+```
 
-```{r, echo=FALSE}
-  valor
+En este caso se valorizará la 3ra modalidad de negociación. El valor que representa este negocio a un tercero es de `r dollar(valor.sistema.00.3ro$Energia$vp.base*1e-6)` billones, con una TIR de `r percent(valor.sistema.00.3ro$Energia$tir)`.
+
+El resumen del pagos de la concesión es el siguiente:
+
+`r knitr::kable(tabla, col.names = c("Pago anual", "Pago anticipado", "Periodo utilizado"), caption = "Resumen de pagos concesión")`
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
 
 valor.sistema.00.3ro.fen$Energia %>% 
   ggplot(aes( x = Año, y = FEN)) + 
   geom_col(aes( y = Ingresos.Brutos), fill = "green4") +
   geom_col(aes( y = -Costos - Inversion), fill = "red4") +
-  theme_axon()+
-  geom_line(size = 2, col = "blue4") 
+  theme_axon() +
+  geom_line(size = 2, col = "grey") +
+  scale_y_continuous(breaks = pretty_breaks(10), labels = dollar) +
+  ggtitle("Evolución FEN", "Datos en miles de US$")
 
-p1
+
 
   
 ```
