@@ -134,7 +134,7 @@ En el caso del financiamiento, se ha establecido un periodo de 30 años para pod
     prueba <- safe_read(url)
     
     
-    if (is_null(prueba$result)) {
+    if (!curl::has_internet()) {
       betas <- readRDS("app/Datos/Intermodal/betas2017-01-25.rds")
       tasas <- readRDS("app/Datos/Intermodal/tasas2017-01-25.rds")
       costo.deuda <- readRDS("app/Datos/Intermodal/costo.deuda2017-02-09.rds")
@@ -1559,6 +1559,15 @@ valor.SIGSA.00 <- valor.SIGSA.00 %>%
       vp.base = formattable::currency(vp.base, digits = 0),
       tir     = formattable::percent(tir))
 
+escenarios.sigsa <- list( Escenario.1 = resultado,
+      Escenario.2 = valor.SIGSA.00,
+      Escenario.3 = valor.SIGSA.10)
+
+escenarios.3ro <- list(Escenario.2 = valor.3ro.10,
+                       Escenario.3 = valor.3ro.00)
+
+escenarios <- list(SIGSA   = escenarios.sigsa,
+                   Tercero = escenarios.3ro)
 
 ```
 
