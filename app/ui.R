@@ -52,7 +52,7 @@ ui <- navbarPage(
                  "Tasa de retorno",
                  choices = list("Automatica" = FALSE, "Manual" =
                                   TRUE),
-                 selected = TRUE
+                 selected = FALSE
                ),
                sliderInput(
                  "tasa.descuento",
@@ -97,20 +97,20 @@ ui <- navbarPage(
              ),
              mainPanel(h1("Evaluación Base"),
                                   h2("Sistema Completo"),
-               tabPanel("VPN Proyecto completo", dataTableOutput("total")),
-               h2("VPN por sistema"),
-               tabPanel("VPN por Sistema", dataTableOutput("sistema")),
-               h2("VPN por elemento"),
-               tabPanel("VPN por Elemento", dataTableOutput("elemento")),
-               h1("Evaluación construcción Infraestructura por parte de SIGSA"),
-               h2("VPN 3ro por sistema"),
-               tabPanel("VPN Tercero, Sistema", dataTableOutput("tercero.sistema")),
-               h2("VPN 3ro por elemento"),
-               tabPanel("VPN Tercero, Elemento", dataTableOutput("tercero.elemento")),
-               h2("VPN SIGSA por Sistema"),
-               tabPanel("VPN SIGSA, Sistema", dataTableOutput("sigsa.sistema")),
-               h2("VPN SIGSA por Elemento"),
-               tabPanel("VPN SIGSA, Elemento", dataTableOutput("sigsa.elemento"))
+               tabPanel("VPN Proyecto completo", dataTableOutput("total"))
+               # h2("VPN por sistema"),
+               # tabPanel("VPN por Sistema", dataTableOutput("sistema")),
+               # h2("VPN por elemento"),
+               # tabPanel("VPN por Elemento", dataTableOutput("elemento")),
+               # h1("Evaluación construcción Infraestructura por parte de SIGSA"),
+               # h2("VPN 3ro por sistema"),
+               # tabPanel("VPN Tercero, Sistema", dataTableOutput("tercero.sistema")),
+               # h2("VPN 3ro por elemento"),
+               # tabPanel("VPN Tercero, Elemento", dataTableOutput("tercero.elemento")),
+               # h2("VPN SIGSA por Sistema"),
+               # tabPanel("VPN SIGSA, Sistema", dataTableOutput("sigsa.sistema")),
+               # h2("VPN SIGSA por Elemento"),
+               # tabPanel("VPN SIGSA, Elemento", dataTableOutput("sigsa.elemento"))
              )
            ))
 )

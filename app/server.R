@@ -8,11 +8,11 @@ require(FinCal)
 require(scales)
 require(purrr)
 
-Demanda <- read_excel("Datos/Intermodal/Ingresos.xlsx", sheet = "Demanda")
-Tarifas <- read_excel("Datos/Intermodal/Ingresos.xlsx", sheet = "Tarifas")
-Costos <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx", sheet = "Costos")
-Inversiones <- read_excel("Datos/Intermodal/Costos e Inversiones.xlsx", sheet = "Inversiones")
-Ingresos.poliducto <- read_excel("Datos/Intermodal/Ingresos.xlsx", sheet = "Ingresos")
+Demanda <- read_excel("Datos/Intermodal/Ingresos-2018.xlsx", sheet = "Demanda")
+Tarifas <- read_excel("Datos/Intermodal/Ingresos-2018.xlsx", sheet = "Tarifas")
+Costos <- read_excel("Datos/Intermodal/Costos e Inversiones-2018.xlsx", sheet = "Costos")
+Inversiones <- read_excel("Datos/Intermodal/Costos e Inversiones-2018.xlsx", sheet = "Inversiones")
+Ingresos.poliducto <- read_excel("Datos/Intermodal/Ingresos-2018.xlsx", sheet = "Ingresos")
 
 
 
@@ -41,6 +41,118 @@ modelo.base <- function(n                 = 30,
                         Ingresos.poliducto = Ingresos.poliducto) {
   
   
+  
+  # n                 = 30 # Tiempo financiamiento
+  # n.concesion.multi = 50
+  # n.concesion.poli  = 30
+  # r                 = 0.05 ## Tasa financiamiento
+  # r.ice             = 0.0777 ## Tasa Canon Concesión
+  # tasa.retorno.manual = FALSE
+  # tasa.descuento    = 0.08
+  # pct.financiado    = 0.6
+  # tipo.demanda      = "min"
+  # isr               = 0.07
+  # isr2              = 0.25
+  # horizonte         = 2062
+  # regimen.fiscal    = TRUE ## en donde FALSE indica regimen sobre ingresos
+  # split.puertos     = 0.50
+  # pct.royalty       = 0.05
+  # pct.gastos.comercializacion = 0.025
+  # pct.pago.anticipado = 0.045
+  # pg                = 2  ## periodo de gracia canon
+  
+  # Definición de tasas -----------------------------------------------------
+  
+  
+  
+  if (tasa.retorno.manual == TRUE) {
+    expected.return <- tasa.descuento
+  } else{
+    require(rvest)
+    url <- "http://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/totalbeta.html"
+    url2 <- "http://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html"
+    url3 <- "http://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/wacc.htm"
+    
+    safe_read <- safely(read_html)
+    prueba <- safe_read(url)
+    
+    
+    if (!curl::has_internet()) {
+      betas <- readRDS("Datos/Intermodal/betas2017-01-25.rds")
+      tasas <- readRDS("Datos/Intermodal/tasas2017-01-25.rds")
+      costo.deuda <- readRDS("Datos/Intermodal/costo.deuda2017-02-09.rds")
+      
+    } else{
+      betas <- read_html(url) %>% 
+        html_nodes(xpath = "/html/body/table") %>% 
+        html_table()
+      
+      
+      
+      fecha.consulta <- Sys.Date()
+      # flname <- paste0("app/Datos/Intermodal/betas",fecha.consulta,".rds")
+      # saveRDS(object = betas ,file = flname)
+      
+      tasas <- read_html(url2) %>% 
+        html_table()
+      # flname <- paste0("app/Datos/Intermodal/tasas",fecha.consulta,".rds")
+      # saveRDS(object = tasas ,file = flname)
+      
+      costo.deuda <- read_html(url3) %>% 
+        html_table() %>% 
+        as.data.frame()
+      # flname <- paste0("app/Datos/Intermodal/costo.deuda",fecha.consulta,".rds")
+      # saveRDS(object = costo.deuda ,file = flname)
+    }
+    
+    
+    betas <- as.data.frame(betas)
+    names(betas) <- betas[1,]
+    betas <- betas[c(91,92),c(1,2,3)]
+    beta <- betas$`Average Unlevered Beta` %>% 
+      as.numeric() %>% 
+      mean()
+    
+    tasas <- as.data.frame(tasas)
+    names(tasas) <- tasas[2,]
+    
+    tasas  <- tasas[3:nrow(tasas),] 
+    tasas.promedio <- tail(tasas,4)
+    nombres <- c("periodo","SP500","3month.bill","10year.bond")
+    tasas <- tasas.promedio[1:4] 
+    names(tasas) <- nombres
+    tasas <- tasas[2:nrow(tasas),]
+    
+    rm <- tasas[2,2]
+    rf <- tasas[2,4]
+    rm <- rm %>% str_replace("%","")
+    rm <- as.numeric(rm)/100
+    
+    rf <- rf %>% str_replace("%","")
+    rf <- as.numeric(rf)/100
+    expected.return <- rf + beta*(rm - rf + (2.89 + 3.55)/100)
+    expected.return2 <- rf + beta*(rm - rf)
+    financial.data <- data.frame(expected.return, rf, rm,beta)
+    financial.data
+    expected.return <- financial.data[["expected.return"]]
+    
+    names(costo.deuda) <- costo.deuda[1,]
+    costo.deuda <- costo.deuda[2:nrow(costo.deuda),]
+    costo.deuda <- costo.deuda[c(90,91), c(1,7)]
+    costo.deuda$`Cost of Debt` <- costo.deuda$`Cost of Debt` %>% 
+      str_replace("%","") %>% 
+      as.numeric()/100
+    
+  }
+  r <- mean(costo.deuda$`Cost of Debt`)
+  wacc <- expected.return*(1 - pct.financiado) + pct.financiado*r
+  wacc2 <- expected.return2*(1 - pct.financiado) + pct.financiado*r
+  comparacion.wacc <- (wacc - wacc2)/wacc
+  
+  
+  
+# Primer Escenario --------------------------------------------------------
+  
   # Demanda -----------------------------------------------------------------
   
   Demanda <-   Demanda %>%
@@ -68,7 +180,6 @@ modelo.base <- function(n                 = 30,
   # Tabla principal para modelar los ingresos
   Ingresos <- left_join(Tarifas, Demanda) %>%
     mutate(Año = as.factor(Año))
-  
   
   # Seleccion de tipo de demanda para modelar los ingresos del sistema y elementos multimodales
   
@@ -309,7 +420,7 @@ modelo.base <- function(n                 = 30,
     }
     
     
-    if(exists("Componente",df)) {
+    if (exists("Componente",df)) {
       escenario  <- escenario %>% mutate(Pago = Intereses + Amortizacion)
       escenario$Componente <- inversion.input$Componente
     } else {
@@ -389,6 +500,7 @@ modelo.base <- function(n                 = 30,
   
   Impuestos.sistema11 <- map2(ingresos.sistema11,inversiones.sistema11,left_join) %>%
     map2(costos.sistema11, left_join, by = "Año") %>%
+    map(replace_na, list(IVAxCobrar.y = 0)) %>% 
     map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y) %>%
     map(select, -Inversion, -Royalty, -Ingresos.Brutos, -IVAxCobrar.x, -IVAxCobrar.y, -Costos ) %>% 
     map(mutate, 
@@ -399,6 +511,7 @@ modelo.base <- function(n                 = 30,
   
   impuestos.elemento11 <- map2(ingresos.elemento11,inversiones.elemento11,left_join) %>%
     map2(costos.elemento11, left_join, by = "Año") %>%
+    map(replace_na, list(IVAxCobrar.y = 0)) %>% 
     map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y) %>%
     map(select, -Inversion, -Royalty, -Ingresos.Brutos, -IVAxCobrar.x, -IVAxCobrar.y, -Costos ) %>% 
     map(mutate, 
@@ -407,73 +520,12 @@ modelo.base <- function(n                 = 30,
         IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) %>% 
     map(select, -contains("aux"))
   
+
   
-  # Valorizacion ------------------------------------------------------------
   
-  if (tasa.retorno.manual == TRUE) {
-    expected.return <- tasa.descuento
-  } else{
-    require(rvest)
-    url <- "http://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/totalbeta.html"
-    url2 <- "http://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html"
-    
-    safe_read <- safely(read_html)
-    prueba <- safe_read(url)
-    
-    
-    if (is_null(prueba$result)) {
-      betas <- readRDS("Datos/Intermodal/betas2017-01-25.rds")
-      tasas <- readRDS("Datos/Intermodal/tasas2017-01-25.rds")
-      
-    } else{
-      betas <- read_html(url) %>% 
-        html_nodes(xpath = "/html/body/table") %>% 
-        html_table()
-      
-      fecha.consulta <- Sys.Date()
-      flname <- paste0("Datos/Intermodal/betas",fecha.consulta,".rds")
-      saveRDS(object = betas ,file = flname)
-      
-      tasas <- read_html(url2) %>% 
-        html_table()
-      
-      flname <- paste0("Datos/Intermodal/tasas",fecha.consulta,".rds")
-      saveRDS(object = tasas ,file = flname)
-    }
-    
-    
-    betas <- as.data.frame(betas)
-    names(betas) <- betas[1,]
-    betas <- betas[c(91,92),c(1,3)]
-    beta <- betas$`Average Unlevered Beta` %>% 
-      as.numeric() %>% 
-      mean()
-    
-    tasas <- as.data.frame(tasas)
-    names(tasas) <- tasas[2,]
-    
-    tasas  <- tasas[3:nrow(tasas),] 
-    tasas.promedio <- tail(tasas,9) %>% head(4)
-    nombres <- c("periodo","SP500","3month.bill","10year.bond")
-    tasas <- tasas.promedio[1:4] 
-    names(tasas) <- nombres
-    tasas <- tasas[2:nrow(tasas),]
-    
-    rm <- tasas[3,2]
-    rf <- tasas[3,4]
-    rm <- rm %>% str_replace("%","")
-    rm <- as.numeric(rm)/100
-    
-    rf <- rf %>% str_replace("%","")
-    rf <- as.numeric(rf)/100
-    expected.return <- rf + beta*(rm - rf)
-    financial.data <- data.frame(expected.return, rf, rm,beta)
-    financial.data
-    expected.return <- financial.data[["expected.return"]]
-  }
+  # Evaluación de escenarios
+
   
- 
-  r.ice <- expected.return
   ### Creación de data frames que sirven de input para el calculo del VP base del 
   ### proyecto y VP del financiamiento en las modalidades: 
   ### Sistema completo, portipo de sistema y por elemento del sistema
@@ -570,11 +622,10 @@ modelo.base <- function(n                 = 30,
     }
   }
   
-  
   ### Parametros del modelo
   n.multi <- primer.año + n.concesion.multi
   n.poli <- primer.año + n.concesion.poli
-  r.input <- list(expected.return)
+  r.input <- list(wacc)
   horizonte.input <- list(n.multi)
   res.input <- list(1)
   regimen.fiscal.input <-  list(regimen.fiscal)
@@ -601,9 +652,6 @@ modelo.base <- function(n                 = 30,
   valor.elemento11 <- bind_rows(valor.elemento11, .id = "Elemento")
   
   ### Parametros para financiamiento 
-  
-  n.multi <- primer.año + n.concesion.multi
-  n.poli <- primer.año + n.concesion.poli
   r.input <- list(r)
   horizonte.input <- list(n.multi)
   res.input <- list(1)
@@ -622,8 +670,6 @@ modelo.base <- function(n                 = 30,
   
   ### Calculo de vp del financiamiento para cada modalidad
   
-  
-  
   valor.sistema.completo.fin <- pmap(params.completo.fin, calcular_vpnf)
   valor.sistema11.fin <- pmap(params.sistema.fin, calcular_vpnf)
   valor.elemento11.fin <- pmap(params.elemento.fin, calcular_vpnf)
@@ -631,8 +677,8 @@ modelo.base <- function(n                 = 30,
   valor.elemento11.fin <- bind_rows(valor.elemento11.fin, .id = "Elemento")
   
   ### DF para cada variedad
-  valor.completo <-   bind_cols(valor.sistema.completo,
-                                valor.sistema.completo.fin) %>% 
+  valor.completo <- bind_cols(valor.sistema.completo,
+                              valor.sistema.completo.fin) %>% 
     mutate(vp.total = vp.base + vp.fin)
   
   valor.sistema <- left_join(valor.sistema11, valor.sistema11.fin) %>% 
@@ -641,7 +687,7 @@ modelo.base <- function(n                 = 30,
   valor.elemento <- left_join(valor.elemento11, valor.elemento11.fin) %>% 
     mutate(vp.total = vp.base + vp.fin)
   
-
+  
   
   resultado <- list(Completo = valor.completo, 
                     Sistema  = valor.sistema, 
@@ -653,11 +699,15 @@ modelo.base <- function(n                 = 30,
         vp.base = formattable::currency(vp.base, digits = 0),
         vp.fin  = formattable::currency(vp.fin, digits = 0),
         vp.total  = formattable::currency(vp.total, digits = 0),
-        tir = formattable::percent(tir))
-  
+        tir = formattable::percent(tir)) %>% 
+    map(select, -vp.fin, -vp.total)
   
 
-  # Calculo de canones Concesión e Infraestructura-------------------------------------------------
+  # Segundo Escenario -------------------------------------------------------
+  
+## Calculo valor concesión
+  
+  r.ice = expected.return2
   
   ### Calculo valor de concesion
   
@@ -693,8 +743,7 @@ modelo.base <- function(n                 = 30,
                        n.concesion.poli, 
                        n.concesion.multi))
   
-  
-  ### Calculo uso infraestructuras
+    
   
   canon.infra.completo <- inversiones.sistema10 %>% 
     bind_rows(.id = "Sistema") %>% 
@@ -753,17 +802,17 @@ modelo.base <- function(n                 = 30,
   #### Funcion que crea df "costos.adicionales" que usare para la evaluacion de fen para sistema y un tercero 
   
   calcular.costos.adicionales <- function(df, nombre, pg){
-    costos.adicionales <- data.frame(Año = numeric(df$n),
-                                     Anticipo = numeric(df$n),
-                                     Pago = numeric(df$n))
-    costos.adicionales[1,] <- c(2012, df$pago.anticipado, 0)
-    costos.adicionales$Año <- seq(1:df$n) + 2012 - 1
+    costos.adicionales <- data.frame(Año = numeric(df$n + 1 ),
+                                     Anticipo = numeric(df$n + 1),
+                                     Pago = numeric(df$n + 1 ))
+    costos.adicionales[1,] <- c(primer.año, df$pago.anticipado, 0)
+    costos.adicionales$Año <- seq(1:(df$n + 1)) + primer.año - 1
     costos.adicionales$Año <- costos.adicionales$Año %>% as.factor()
     if (pg == 0) {
-      costos.adicionales$Pago[2:df$n] <- df$pago
+      costos.adicionales$Pago[2:(df$n + 1)] <- df$pago
     } else{
       costos.adicionales$Pago[2:(2 + pg)] <- 0
-      costos.adicionales$Pago[(3 + pg):df$n] <- df$pago
+      costos.adicionales$Pago[(2 + pg):(df$n + 1 )] <- df$pago
     }
     costos.adicionales <- costos.adicionales %>% 
       mutate(IVAxCobrar = (Anticipo + Pago)*0.12)
@@ -778,7 +827,7 @@ modelo.base <- function(n                 = 30,
   
   valores.concesion.sistema <- concesion.sistema %>% 
     split(.$Sistema) %>% 
-    map(calcular.costos.adicionales, "concesion", pg = pg)
+    map(calcular.costos.adicionales, "concesion", pg = 1)
   
   valores.canon.infr.sistema <- canon.infra.sistema %>% 
     split(.$Sistema) %>% 
@@ -816,7 +865,12 @@ modelo.base <- function(n                 = 30,
     map2(valores.canon.infr.sistema, left_join, by = "Año") %>% 
     map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
         Costos = Costos + Anticipo.canon.infra + Pago.canon.infra) %>% 
-    map(select, -IVAxCobrar.x, -IVAxCobrar.y, -Anticipo.canon.infra, -Pago.canon.infra)
+    map(select, -IVAxCobrar.x, -IVAxCobrar.y, -Anticipo.canon.infra, -Pago.canon.infra) %>% 
+    map2(ingresos.sistema11, left_join, by = "Año") %>% 
+    map(replace_na, list(Royalty = 0)) %>% 
+    map(mutate, Costos = Costos + Royalty,
+        IVAxCobrar = Costos*0.12) %>% 
+    map(select, Año, Costos, IVAxCobrar)
   
   
   #### Elemento
@@ -838,7 +892,12 @@ modelo.base <- function(n                 = 30,
     map2(valores.canon.infr.elemento, left_join, by = "Año") %>% 
     map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
         Costos = Costos + Anticipo.canon.infra + Pago.canon.infra) %>% 
-    map(select, -IVAxCobrar.x, -IVAxCobrar.y, -Anticipo.canon.infra, -Pago.canon.infra)
+    map(select, -IVAxCobrar.x, -IVAxCobrar.y, -Anticipo.canon.infra, -Pago.canon.infra) %>% 
+    map2(ingresos.elemento11, left_join, by = "Año") %>% 
+    map(replace_na, list(Royalty = 0)) %>% 
+    map(mutate, Costos = Costos + Royalty,
+        IVAxCobrar = Costos*0.12) %>% 
+    map(select, Año, Costos, IVAxCobrar)
   
   
   #### Calculo de ingresos y costos propios
@@ -954,6 +1013,7 @@ modelo.base <- function(n                 = 30,
   
   impuestos.sistema.3ro <- map2(ingresos.sistema11, inversiones.sistema.3ro, left_join) %>% 
     map2(costos.sistema.3ro, left_join, by = "Año") %>% 
+    map(replace_na, list(IVAxCobrar.y = 0)) %>% 
     map(select, -Inversion, -Royalty, -Ingresos.Brutos, -Costos ) %>% 
     map(mutate,
         IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
@@ -965,6 +1025,7 @@ modelo.base <- function(n                 = 30,
   
   impuestos.elemento.3ro <- map2(ingresos.elemento11, inversiones.elemento.3ro, left_join) %>% 
     map2(costos.elemento.3ro, left_join, by = "Año") %>% 
+    map(replace_na, list(IVAxCobrar.y = 0)) %>% 
     map(select, -Inversion, -Royalty, -Ingresos.Brutos, -Costos ) %>% 
     map(mutate,
         IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
@@ -1086,8 +1147,8 @@ modelo.base <- function(n                 = 30,
   valor.sistema.10.propio <- pmap(params.sistema, calcular_fen)
   valor.elemento.10.propio <- pmap(params.elemento, calcular_fen)
   
-  params.sistema.fin$r <- list(r)
-  params.elemento.fin$r <- list(r)
+  params.sistema.fin$r <- list(expected.return)
+  params.elemento.fin$r <- list(expected.return)
   params.sistema.fin$df <- df.sistema.3ro
   params.elemento.fin$df <- df.elemento.3ro
   
@@ -1100,21 +1161,19 @@ modelo.base <- function(n                 = 30,
   valor.elemento.fin.propio <- pmap(params.elemento.fin, calcular_vpnf)
   
   
-  
+  valor.sistema.10.3ro
   valor.sistema.10  <- map2(valor.sistema.10.3ro, valor.sistema.fin.3ro, bind_cols) %>% 
     bind_rows(.id = "Sistema")
   
   valor.elemento.10 <- map2(valor.elemento.10.3ro, valor.elemento.fin.3ro, bind_cols) %>% 
     bind_rows(.id = "Elemento")
   
-  valor.3ro <- list(valor.sistema.10, valor.elemento.10 )
+  valor.3ro.10 <- list(Sistema = valor.sistema.10, Elemento = valor.elemento.10 )
   
-  valor.3ro <- valor.3ro %>% 
-    map(select, -flujo.base, -flujo.fin) %>% 
+  valor.3ro.10 <- valor.3ro.10 %>% 
+    map(select, -flujo.base, -flujo.fin, -vp.fin) %>% 
     map(mutate, 
         vp.base = formattable::currency(vp.base, digits = 0),
-        vp.fin = formattable::currency(vp.fin, digits = 0),
-        vp.total = vp.base + vp.fin,
         tir = formattable::percent(tir))
   
   
@@ -1125,21 +1184,236 @@ modelo.base <- function(n                 = 30,
     bind_rows(.id = "Elemento")
   
   
-  valor.SIGSA <- list(valor.sistema.10.sigsa, valor.elemento.10.sigsa)
+  valor.SIGSA.10 <- list(Sistema = valor.sistema.10.sigsa, Elemento = valor.elemento.10.sigsa)
   
   
-  valor.SIGSA <- valor.SIGSA %>% 
-    map(select, -flujo.base, -flujo.fin, -tir) %>% 
+  valor.SIGSA.10 <- valor.SIGSA.10 %>% 
+    map(select, -flujo.base, -flujo.fin, -vp.fin) %>% 
     map(mutate, 
         vp.base = formattable::currency(vp.base, digits = 0),
-        vp.fin = formattable::currency(vp.fin, digits = 0),
-        vp.total = vp.base + vp.fin)
+        tir     = formattable::percent(tir))
+
+# Escenario 3 -------------------------------------------------------------
+  # Separacion de costos e inversiones de 3ro
   
-  lista <- list(resultado, valor.3ro, valor.SIGSA)
+  ## Sistema
+  costos.sistema.3ro.00 <- costos.sistema11 %>% 
+    map2(valores.concesion.sistema, left_join, by = "Año") %>% 
+    map(replace_na, list(Anticipo.concesion = 0, Pago.concesion = 0)) %>% 
+    map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
+        Costos = Costos + Anticipo.concesion + Pago.concesion) %>%
+    map(select, -IVAxCobrar.x, -IVAxCobrar.y, -Anticipo.concesion, -Pago.concesion) %>% 
+    map2(ingresos.sistema11, left_join, by = "Año") %>% 
+    map(replace_na, list(Royalty = 0)) %>% 
+    map(mutate, Costos = Costos + Royalty,
+        IVAxCobrar = Costos*0.12) %>% 
+    map(select, Año, Costos, IVAxCobrar)
   
   
-  return(lista)
+  inversiones.sistema.3ro.00 <- inversiones.sistema11 
+  
+  #### Elemento
+  costos.elemento.3ro.00 <- costos.elemento11 %>% 
+    map2(valores.concesion.elemento, left_join, by = "Año") %>% 
+    map(mutate, IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
+        Costos = Costos + Anticipo.concesion + Pago.concesion) %>% 
+    map(select, -IVAxCobrar.x, -IVAxCobrar.y, -Anticipo.concesion, -Pago.concesion) %>% 
+    map2(ingresos.elemento11, left_join, by = "Año") %>% 
+    map(replace_na, list(Royalty = 0)) %>% 
+    map(mutate, Costos = Costos + Royalty,
+        IVAxCobrar = Costos*0.12) %>% 
+    map(select, Año, Costos, IVAxCobrar)
+  
+  inversiones.elemento.3ro.00 <- inversiones.elemento11
+  
+  # Costos e ingresos propios
+  
+  ingresos.sistema.propios.00 <- map2(ingresos.sistema11, valores.concesion.sistema, full_join, by = "Año") %>% 
+    map(select, Año, Royalty, contains("Anticipo"), contains("Pago")) %>% 
+    map(replace_na, replace = list(Royalty = 0, Anticipo.concesion = 0, Pago.concesion = 0)) %>% 
+    map(mutate, Ingresos.Brutos = Royalty + Anticipo.concesion + Pago.concesion) %>% 
+    map(select, Año, Ingresos.Brutos) %>% 
+    map(mutate, IVAxPagar = Ingresos.Brutos*0.12,
+        Año = as.numeric(as.character(Año))) %>% 
+    map(arrange, Año)
+  
+  ingresos.elemento.propios.00 <- map2(ingresos.elemento11, valores.concesion.elemento, full_join, by = "Año") %>% 
+    map(select, Año, Royalty, contains("Anticipo"), contains("Pago")) %>% 
+    map(replace_na, replace = list(Royalty = 0, Anticipo.concesion = 0, Pago.concesion = 0)) %>% 
+    map(mutate, Ingresos.Brutos = Royalty + Anticipo.concesion + Pago.concesion) %>% 
+    map(select, Año, Ingresos.Brutos) %>% 
+    map(mutate, IVAxPagar = Ingresos.Brutos*0.12,
+        Año = as.numeric(as.character(Año))) %>% 
+    map(arrange, Año)
+  
+  
+  costos.sistema.propios.00 <- ingresos.sistema.propios.00 %>% 
+    map(mutate, Costos = pct.gastos.comercializacion*Ingresos.Brutos,
+        IVAxCobrar    = Costos*0.12) %>% 
+    map(select, -IVAxPagar, -Ingresos.Brutos)
+  
+  
+  costos.elemento.propios.00 <- ingresos.elemento.propios.00 %>% 
+    map(mutate, Costos = pct.gastos.comercializacion*Ingresos.Brutos,
+        IVAxCobrar    = Costos*0.12) %>% 
+    map(select, -IVAxPagar, -Ingresos.Brutos)
+  
+  
+  # Financiamiento 3ro  ----------------------------------------------
+  
+  financiamiento.sistema.3ro.00 <- inversiones.sistema.3ro.00 %>% 
+    map2(ingresos.sistema11, left_join) %>% 
+    map(amortizacion, 
+        pct.financiado = pct.financiado,
+        n = n,
+        r = r)
+  
+  financiamiento.elemento.3ro.00 <- inversiones.elemento.3ro.00 %>% 
+    map2(ingresos.elemento11, left_join) %>% 
+    map(amortizacion,
+        pct.financiado = pct.financiado,
+        n = n,
+        r = r)
+  
+  # Impuestos
+  
+  impuestos.sistema.3ro.00 <- map2(ingresos.sistema11, inversiones.sistema.3ro.00, left_join) %>% 
+    map2(costos.sistema.3ro.00, left_join, by = "Año") %>% 
+    map(select, -Inversion, -Royalty, -Ingresos.Brutos, -Costos ) %>% 
+    map(replace_na, list(IVAxCobrar.y = 0)) %>% 
+    map(mutate,
+        IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
+        IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
+        IVA.aux2 = IVAxCobrar - IVAxPagar,
+        IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) %>% 
+    map(select, -IVAxCobrar.x, -IVAxCobrar.y)
+  
+  impuestos.sistema.propios.00 <- map2(ingresos.sistema.propios.00, costos.sistema.propios.00, left_join) %>% 
+    map(select, -Ingresos.Brutos, -Costos) %>% 
+    map(mutate,IVA.Neto = IVAxCobrar - IVAxPagar) 
+  
+  
+  impuestos.elemento.3ro <- map2(ingresos.elemento11, inversiones.elemento.3ro, left_join) %>% 
+    map2(costos.elemento.3ro, left_join, by = "Año") %>% 
+    map(select, -Inversion, -Royalty, -Ingresos.Brutos, -Costos ) %>% 
+    map(mutate,
+        IVAxCobrar = IVAxCobrar.x + IVAxCobrar.y,
+        IVA.aux1 = cumsum(IVAxCobrar - IVAxPagar),
+        IVA.aux2 = IVAxCobrar - IVAxPagar,
+        IVA.Neto = if_else(lag(IVA.aux1) < 0 ,IVA.aux2, IVA.aux1)) %>% 
+    map(select, -IVAxCobrar.x, -IVAxCobrar.y)
+  
+  
+  impuestos.elemento.propios.00 <- map2(ingresos.elemento.propios.00, costos.elemento.propios.00, left_join) %>% 
+    map(select, -Ingresos.Brutos, -Costos) %>% 
+    map(mutate,IVA.Neto = IVAxCobrar - IVAxPagar) 
+  
+  # Valoracion 3ro 00
+  
+  df.sistema.3ro.00 <- ingresos.sistema11 %>%
+    map2(costos.sistema.3ro.00, full_join) %>%
+    map(select, -contains("IVA")) %>%
+    map2(inversiones.sistema.3ro.00, full_join) %>%
+    map(select, -contains("IVA")) %>%
+    map2(financiamiento.sistema.3ro.00, full_join) %>%
+    map(select, -Saldo, -Amortizacion) %>%
+    map2(impuestos.sistema.3ro.00, full_join) %>%
+    map(select, -contains("IVAx")) %>%
+    map(replace_na, replace = list(Ingresos.Brutos = 0,
+                                   Royalty = 0,
+                                   ISR = 0,
+                                   Costos = 0,
+                                   Inversion = 0,
+                                   Pago = 0,
+                                   IVA.Neto = 0,
+                                   Intereses = 0)) %>% 
+    map(mutate, Costos = Royalty + Costos) %>% 
+    map(select, -Royalty)
+  
+  
+  df.sistema.propio.00 <- ingresos.sistema.propios.00 %>% 
+    map2(costos.sistema.propios.00, full_join) %>% 
+    map(select, -contains("IVA")) %>% 
+    map2(impuestos.sistema.propios.00, full_join) %>% 
+    map(mutate, ISR = isr*Ingresos.Brutos,
+        Inversion = 0,
+        Pago = 0,
+        Intereses = 0)
+  
+  
+  df.elemento.propio.00 <- ingresos.elemento.propios.00 %>% 
+    map2(costos.elemento.propios.00, full_join) %>% 
+    map(select, -contains("IVA")) %>% 
+    map2(impuestos.elemento.propios.00, full_join) %>% 
+    map(mutate, ISR = isr*Ingresos.Brutos,
+        Inversion = 0,
+        Pago = 0,
+        Intereses = 0)
+  
+  
+  df.elemento.3ro.00 <- ingresos.elemento11 %>%
+    map2(costos.elemento.3ro, full_join) %>%
+    map(select, -contains("IVA")) %>%
+    map2(inversiones.elemento.3ro, full_join) %>%
+    map(select, -contains("IVA")) %>%
+    map2(financiamiento.elemento.3ro, full_join) %>%
+    map(select, -Saldo, -Amortizacion) %>%
+    map2(impuestos.elemento.3ro, full_join) %>%
+    map(select, -contains("IVAx")) %>%
+    map(replace_na, replace = list(Ingresos.Brutos = 0,
+                                   Royalty = 0,
+                                   ISR = 0,
+                                   Costos = 0,
+                                   Inversion = 0,
+                                   Pago = 0,
+                                   IVA.Neto = 0,
+                                   Intereses = 0))
+  
+  ## Valor 3ro
+  params.sistema$df <- df.sistema.3ro.00
+  params.sistema$res <- 1
+  valor.sistema.00.3ro <-  pmap(params.sistema, calcular_fen) %>% bind_rows( .id = "Sistema")
+  params.elemento$df <- df.elemento.3ro.00
+  valor.elemento.00.3ro <-  pmap(params.elemento, calcular_fen) %>% bind_rows( .id = "Elemento")
+  ## Valor SIGSA
+  params.sistema$df <- df.sistema.propio.00
+  valor.sistema.00.SIGSA <- pmap(params.sistema, calcular_fen) %>% bind_rows( .id = "Sistema")
+  params.elemento$df <- df.elemento.propio.00
+  valor.elemento.00.SIGSA <- pmap(params.elemento, calcular_fen) %>% bind_rows( .id = "Elemento")
+  
+  
+  
+  valor.3ro.00 <- list(Sistema = valor.sistema.00.3ro, Elemento = valor.elemento.00.3ro)
+  valor.SIGSA.00 <- list(Sistema = valor.sistema.00.SIGSA, Elemento = valor.elemento.00.SIGSA)
+  
+  valor.3ro.00 <- valor.3ro.00 %>% 
+    map(select, -flujo.base) %>% 
+    map(mutate, 
+        vp.base = formattable::currency(vp.base, digits = 0),
+        tir     = formattable::percent(tir))
+  
+  
+  valor.SIGSA.00 <- valor.SIGSA.00 %>% 
+    map(select, -flujo.base) %>% 
+    map(mutate, 
+        vp.base = formattable::currency(vp.base, digits = 0),
+        tir     = formattable::percent(tir))
+  
+  escenarios.sigsa <- list( Escenario.1 = resultado,
+                            Escenario.2 = valor.SIGSA.00,
+                            Escenario.3 = valor.SIGSA.10)
+  
+  escenarios.3ro <- list(Escenario.2 = valor.3ro.10,
+                         Escenario.3 = valor.3ro.00)
+  
+  escenarios <- list(SIGSA   = escenarios.sigsa,
+                     Tercero = escenarios.3ro)
+    
+  return(escenarios)
 }
+
+
+
 
 
 server <- shinyServer( function(input, output) {
@@ -1179,54 +1453,49 @@ server <- shinyServer( function(input, output) {
   })
 output$total <- renderDataTable({
 
-  r()[[1]][[1]] %>% 
-    mutate( 
-        vp.base = formattable::currency(vp.base, digits = 0),
-        vp.fin  = dollar(vp.fin),
-        vp.total  = dollar(vp.total),
-        tir = formattable::percent(tir)) 
+  r()[["SIGSA"]][["Escenario.1"]][["Sistema"]]
   
   
   })
-output$sistema <- renderDataTable({
-  withProgress(message = 'Calculando:',
-               detail = 'VPN sistema...', value = 0, {
-                 for (i in 1:15) {
-                   incProgress(1/5)
-                   Sys.sleep(0.02)
-                 }
-               })
-  r()[[1]][[2]]})  
-output$elemento <- renderDataTable({
-  withProgress(message = 'Calculando:',
-               detail = 'VPN elemento...', value = 0, {
-                 for (i in 1:15) {
-                   incProgress(1/5)
-                   Sys.sleep(0.02)
-                 }
-               })
-  r()[[1]][[3]]})
-output$tercero.sistema <- renderDataTable({
-  withProgress(message = 'Calculando análisis infraestructura',
-               detail = 'VPNs 3ro...', value = 0, {
-                 for (i in 1:15) {
-                   incProgress(1/5)
-                   Sys.sleep(0.02)
-                 }
-               })
-  r()[[2]][[1]]})
-output$tercero.elemento <- renderDataTable({r()[[2]][[2]]})
-output$sigsa.sistema <- renderDataTable({
-  withProgress(message = 'Calculando análisis infraestructura',
-               detail = 'VPNs SIGSA...', value = 0, {
-                 for (i in 1:15) {
-                   incProgress(1/5)
-                   Sys.sleep(0.15)
-                 }
-               })
-  
-  r()[[3]][[1]]})
-output$sigsa.elemento <- renderDataTable({r()[[3]][[2]]})
+# output$sistema <- renderDataTable({
+#   withProgress(message = 'Calculando:',
+#                detail = 'VPN sistema...', value = 0, {
+#                  for (i in 1:15) {
+#                    incProgress(1/5)
+#                    Sys.sleep(0.02)
+#                  }
+#                })
+#   r()[[1]][[2]]})  
+# output$elemento <- renderDataTable({
+#   withProgress(message = 'Calculando:',
+#                detail = 'VPN elemento...', value = 0, {
+#                  for (i in 1:15) {
+#                    incProgress(1/5)
+#                    Sys.sleep(0.02)
+#                  }
+#                })
+#   r()[[1]][[3]]})
+# output$tercero.sistema <- renderDataTable({
+#   withProgress(message = 'Calculando análisis infraestructura',
+#                detail = 'VPNs 3ro...', value = 0, {
+#                  for (i in 1:15) {
+#                    incProgress(1/5)
+#                    Sys.sleep(0.02)
+#                  }
+#                })
+#   r()[[2]][[1]]})
+# output$tercero.elemento <- renderDataTable({r()[[2]][[2]]})
+# output$sigsa.sistema <- renderDataTable({
+#   withProgress(message = 'Calculando análisis infraestructura',
+#                detail = 'VPNs SIGSA...', value = 0, {
+#                  for (i in 1:15) {
+#                    incProgress(1/5)
+#                    Sys.sleep(0.15)
+#                  }
+#                })
+#   
+#   r()[[3]][[1]]})
+# output$sigsa.elemento <- renderDataTable({r()[[3]][[2]]})
 
 }
 )
