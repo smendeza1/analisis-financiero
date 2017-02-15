@@ -26,7 +26,7 @@ require(rvest)
 
 ```{r global, include=FALSE}
 # Información utilizada por la función para poder funcionar
-  Demanda <- read_excel("app/Datos/Intermodal/Ingresos-2018-1poli.xlsx", sheet = "Demanda")
+Demanda <- read_excel("app/Datos/Intermodal/Ingresos-2018-1poli.xlsx", sheet = "Demanda")
 Tarifas <- read_excel("app/Datos/Intermodal/Ingresos-2018-1poli.xlsx", sheet = "Tarifas")
 Costos <- read_excel("app/Datos/Intermodal/Costos e Inversiones-2018-1poli.xlsx", sheet = "Costos")
 Inversiones <- read_excel("app/Datos/Intermodal/Costos e Inversiones-2018-1poli.xlsx", sheet = "Inversiones")
@@ -37,8 +37,8 @@ Ingresos.poliducto <- read_excel("app/Datos/Intermodal/Ingresos-2018-1poli.xlsx"
 n                 = 30 # Tiempo financiamiento
 n.concesion.multi = 50
 n.concesion.poli  = 30
-r                 = 0.05 ## Tasa financiamiento
-r.ice             = 0.0777 ## Tasa Canon Concesión
+r.ice             = 0.01 ## Tasa Canon Concesión
+r.infra           = 0.10
 tasa.retorno.manual = FALSE
 tasa.descuento    = 0.08
 pct.financiado    = 0.6
@@ -704,9 +704,8 @@ valor1 <- resultado$Sistema
 ```{r concesiones, echo=FALSE, message=FALSE, warning=FALSE}
 
 # Calculo de canones Concesión e Infraestructura-------------------------------------------------
-r.ice = 0.01
 
-### Calculo valor de concesion
+## Calculo valor de concesion
 
 concesion.completo <- valor.completo$vp.base %>%   
     canon(tasa.descuento.ice = r.ice, 
@@ -795,15 +794,15 @@ concesion.elemento %>% filter(Elemento != "Poliductos") %>%
 
 
 ```{r concesion infraestructura}
-### Calculo uso infraestructuras
+## Calculo uso infraestructuras
 
 canon.infra.completo <- inversiones.sistema10 %>% 
   bind_rows(.id = "Sistema") %>% 
   filter(Componente == "Infraestructura") %>% 
   summarize(Inversion = sum(Inversion)) %>% 
   .$Inversion %>% 
-  npv(r = r.ice) %>% 
-  canon(tasa.descuento.ice = r.ice,
+  npv(r = r) %>% 
+  canon(tasa.descuento.ice = r.infra,
         n.canon = n.concesion.multi,
         pg = pg,
         pct.pago.anticipado = pct.pago.anticipado)
@@ -814,11 +813,11 @@ canon.infra.sistema <- inversiones.sistema10  %>%
   map(filter, Componente == "Infraestructura") %>% 
   map(ungroup) %>% 
   map(select, Inversion) %>% 
-  map(function(df) npv(r = r.ice, cf = df$Inversion)) %>% 
+  map(function(df) npv(r = r, cf = df$Inversion)) %>% 
   bind_rows() %>% 
   gather(Sistema, Canon.ICE) %>% 
   .$Canon.ICE %>% 
-  canon(tasa.descuento.ice = r.ice, 
+  canon(tasa.descuento.ice = r.infra, 
         n.canon = c(n.concesion.poli,n.concesion.multi),
         pct.pago.anticipado = pct.pago.anticipado,
         pg = pg)
@@ -832,11 +831,11 @@ canon.infra.elemento <- inversiones.elemento10  %>%
   map(filter, Componente == "Infraestructura") %>% 
   map(ungroup) %>% 
   map(select, Inversion) %>% 
-  map(function(df) npv(r = r.ice, cf = df$Inversion)) %>% 
+  map(function(df) npv(r = r, cf = df$Inversion)) %>% 
   bind_rows() %>% 
   gather(Elemento, Canon.ICE) %>% 
   .$Canon.ICE %>% 
-  canon(tasa.descuento.ice = r.ice, 
+  canon(tasa.descuento.ice = r.infra, 
         n.canon = c(n.concesion.multi,
                    n.concesion.poli,
                    n.concesion.multi,
@@ -1491,21 +1490,23 @@ df.elemento.propio.00 <- ingresos.elemento.propios.00 %>%
 
 ## Valor 3ro
 params.sistema$df <- df.sistema.3ro.00
-params.sistema$res <- 1
 valor.sistema.00.3ro <-  pmap(params.sistema, calcular_fen) %>% bind_rows( .id = "Sistema")
 params.elemento$df <- df.elemento.3ro.00
-params.elemento$res <- 1
 valor.elemento.00.3ro <-  pmap(params.elemento, calcular_fen) %>% bind_rows( .id = "Elemento")
 ## Valor SIGSA
 params.sistema$df <- df.sistema.propio.00
+params.sistema$r <- expected.return2
 valor.sistema.00.SIGSA <- pmap(params.sistema, calcular_fen) %>% bind_rows( .id = "Sistema")
 params.elemento$df <- df.elemento.propio.00
+params.elemento$r <- expected.return2
 valor.elemento.00.SIGSA <- pmap(params.elemento, calcular_fen) %>% bind_rows( .id = "Elemento")
 
 
 
 valor.3ro.00 <- list(Sistema = valor.sistema.00.3ro, Elemento = valor.elemento.00.3ro)
 valor.SIGSA.00 <- list(Sistema = valor.sistema.00.SIGSA, Elemento = valor.elemento.00.SIGSA)
+
+valor.SIGSA.00$Sistema
 
 valor.3ro.00 <- valor.3ro.00 %>% 
   map(select, -flujo.base) %>% 
