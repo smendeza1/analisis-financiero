@@ -883,7 +883,7 @@ valores.canon.infr.completo <- calcular.costos.adicionales(canon.infra.completo,
 
 valores.concesion.sistema <- concesion.sistema %>% 
   split(.$Sistema) %>% 
-  map(calcular.costos.adicionales, "concesion", pg = 1)
+  map(calcular.costos.adicionales, "concesion", pg = pg)
 
 valores.canon.infr.sistema <- canon.infra.sistema %>% 
   split(.$Sistema) %>% 

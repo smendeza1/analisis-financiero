@@ -2762,13 +2762,13 @@ window.FlexDashboardComponents.push({
 <tbody>
 <tr class="odd">
 <td align="left">Energia</td>
-<td align="right">$709,859</td>
-<td align="right">20.51%</td>
+<td align="right">$654,519</td>
+<td align="right">18.52%</td>
 </tr>
 <tr class="even">
 <td align="left">Multimodal</td>
-<td align="right">$-822,496</td>
-<td align="right">5.84%</td>
+<td align="right">$-883,519</td>
+<td align="right">5.73%</td>
 </tr>
 </tbody>
 </table>
@@ -2899,12 +2899,12 @@ window.FlexDashboardComponents.push({
 <tbody>
 <tr class="odd">
 <td align="left">Energia</td>
-<td align="right">$1,172,553</td>
+<td align="right">$1,115,192</td>
 <td align="right">NA</td>
 </tr>
 <tr class="even">
 <td align="left">Multimodal</td>
-<td align="right">$2,111,452</td>
+<td align="right">$2,052,309</td>
 <td align="right">NA</td>
 </tr>
 </tbody>
@@ -4070,7 +4070,7 @@ valores.canon.infr.completo &lt;- calcular.costos.adicionales(canon.infra.comple
 
 valores.concesion.sistema &lt;- concesion.sistema %&gt;% 
   split(.$Sistema) %&gt;% 
-  map(calcular.costos.adicionales, &quot;concesion&quot;, pg = 1)
+  map(calcular.costos.adicionales, &quot;concesion&quot;, pg = pg)
 
 valores.canon.infr.sistema &lt;- canon.infra.sistema %&gt;% 
   split(.$Sistema) %&gt;% 
