@@ -6,6 +6,7 @@ require(stringr)
 require(FinCal)
 require(scales)
 require(purrr)
+require(rvest)
 # # Información utilizada por la función para poder funcionar
 Demanda <- read_excel("app/Datos/Intermodal/Ingresos-2018-1poli.xlsx", sheet = "Demanda")
 Tarifas <- read_excel("app/Datos/Intermodal/Ingresos-2018-1poli.xlsx", sheet = "Tarifas")
@@ -13,28 +14,28 @@ Costos <- read_excel("app/Datos/Intermodal/Costos e Inversiones-2018-1poli.xlsx"
 Inversiones <- read_excel("app/Datos/Intermodal/Costos e Inversiones-2018-1poli.xlsx", sheet = "Inversiones")
 Ingresos.poliducto <- read_excel("app/Datos/Intermodal/Ingresos-2018-1poli.xlsx", sheet = "Ingresos")
 
-
-
-# ##Datos para realizar modificaciones a la función
-n                 = 30 # Tiempo financiamiento
-n.concesion.multi = 50
-n.concesion.poli  = 30
-r                 = 0.05 ## Tasa financiamiento
-r.ice             = 0.0777 ## Tasa Canon Concesión
-tasa.retorno.manual = FALSE
-tasa.descuento    = 0.08
-pct.financiado    = 0.6
-tipo.demanda      = "min"
-isr               = 0.07
-isr2              = 0.25
-horizonte         = 2062
-regimen.fiscal    = TRUE ## en donde FALSE indica regimen sobre ingresos
-split.puertos     = 0.5
-pct.royalty       = 0.05
-pct.gastos.comercializacion = 0.025
-pct.pago.anticipado = 0.05
-pg                = 1  ## periodo de gracia canon
-
+# 
+# 
+# # ##Datos para realizar modificaciones a la función
+# n                 = 30 # Tiempo financiamiento
+# n.concesion.multi = 50
+# n.concesion.poli  = 30
+# r                 = 0.05 ## Tasa financiamiento
+# r.ice             = 0.0777 ## Tasa Canon Concesión
+# tasa.retorno.manual = FALSE
+# tasa.descuento    = 0.08
+# pct.financiado    = 0.6
+# tipo.demanda      = "min"
+# isr               = 0.07
+# isr2              = 0.25
+# horizonte         = 2062
+# regimen.fiscal    = TRUE ## en donde FALSE indica regimen sobre ingresos
+# split.puertos     = 0.5
+# pct.royalty       = 0.05
+# pct.gastos.comercializacion = 0.025
+# pct.pago.anticipado = 0.05
+# pg                = 1  ## periodo de gracia canon
+# 
 
 # Leyendas data frame -----------------------------------------------------
 
@@ -70,7 +71,7 @@ pg                = 1  ## periodo de gracia canon
 modelo.base <- function(n                 = 30,
                         n.concesion.multi = 50,
                         n.concesion.poli  = 30, 
-                        r.ice             = 0.01, ## Tasa de valuación canones
+                        r.ice             = 0.035, ## Tasa de valuación canones
                         r.infra           = 0.1,
                         tasa.descuento    = 0.08,  # Tasa de descuento manual
                         pct.financiado    = 0.6,
@@ -134,7 +135,12 @@ modelo.base <- function(n                 = 30,
     
     betas <- as.data.frame(betas)
     names(betas) <- betas[1,]
-    betas <- betas[c(91,92),c(1,2,3)]
+    betas <- betas[2:nrow(betas), ]
+    
+    # Betas
+    re.beta <- betas %>% filter(str_detect(pattern = "Operations",`Industry Name`))
+    betas <- betas %>% filter(str_detect(pattern = "Transportation", `Industry Name`))
+  
     beta <- betas$`Average Unlevered Beta` %>% 
       as.numeric() %>% 
       mean()
@@ -158,9 +164,9 @@ modelo.base <- function(n                 = 30,
     rf <- as.numeric(rf)/100
     expected.return <- rf + beta*(rm - rf + (2.89 + 3.55)/100)
     expected.return2 <- rf + beta*(rm - rf)
+    expected.return3 <- rf + as.numeric(re.beta$`Average Unlevered Beta`)*(rm - rf + (2.89 + 3.55)/100)
+    expected.return4 <- rf + as.numeric(re.beta$`Average Unlevered Beta`)*(rm - rf)
     financial.data <- data.frame(expected.return, rf, rm,beta)
-    
-    expected.return <- financial.data[["expected.return"]]
     
     names(costo.deuda) <- costo.deuda[1,]
     costo.deuda <- costo.deuda[2:nrow(costo.deuda),]
@@ -174,6 +180,13 @@ modelo.base <- function(n                 = 30,
   wacc <- expected.return*(1 - pct.financiado) + pct.financiado*r
   wacc2 <- expected.return2*(1 - pct.financiado) + pct.financiado*r
   
+  r.tasas <- data.frame(Costo.Deuda = r, 
+                        WACC = wacc, 
+                        WACC2 = wacc2, 
+                        Rp = expected.return, ## Tasa retorno Transporte con riesgo pais
+                        Rp1 = expected.return2, ## Tasa retorno Transporte sin riesgo pais
+                        Rp2 = expected.return3, ## Tasa retorno Real Estate con riesgo pais
+                        Rp3 = expected.return4) ## Tasa retorno Real Estate sin riesgo pais
   
   # Demanda -----------------------------------------------------------------
   
@@ -763,7 +776,7 @@ modelo.base <- function(n                 = 30,
     summarize(Inversion = sum(Inversion)) %>% 
     .$Inversion %>% 
     npv(r = r) %>% 
-    canon(tasa.descuento.ice = r.infra,
+    canon(tasa.descuento.ice = r.ice,
           n.canon = n.concesion.multi,
           pg = pg,
           pct.pago.anticipado = pct.pago.anticipado)
@@ -778,7 +791,7 @@ modelo.base <- function(n                 = 30,
     bind_rows() %>% 
     gather(Sistema, Canon.ICE) %>% 
     .$Canon.ICE %>% 
-    canon(tasa.descuento.ice = r.infra, 
+    canon(tasa.descuento.ice = r.ice, 
           n.canon = c(n.concesion.poli,n.concesion.multi),
           pct.pago.anticipado = pct.pago.anticipado,
           pg = pg)
@@ -796,7 +809,7 @@ modelo.base <- function(n                 = 30,
     bind_rows() %>% 
     gather(Elemento, Canon.ICE) %>% 
     .$Canon.ICE %>% 
-    canon(tasa.descuento.ice = r.infra, 
+    canon(tasa.descuento.ice = r.ice, 
           n.canon = c(n.concesion.multi,
                       n.concesion.poli,
                       n.concesion.multi,
@@ -1434,19 +1447,112 @@ modelo.base <- function(n                 = 30,
   
   canones <- list(Proyecto = proyecto,
                   Infraestructura = infraestructura)
-  
-  resultados <- list(Escenarios = escenarios, Canones = canones)
-  
-    }
 
 
-tmp <- modelo.base(pct.royalty = 0.06,
+
+  # Sistema -----------------------------------------------------------------
+  
+  temp <- resultado[-1] %>% 
+    bind_rows(.id = "Nivel") %>% 
+    mutate(Escenario  = "Escn1",
+           Interesado = "SIGSA",
+           Nombre     =  if_else(is.na(Elemento),
+                                 Sistema,
+                                 Elemento)) %>% 
+    select(-Sistema, -Elemento) 
+  
+  temp2 <- valor.SIGSA.10 %>% 
+    bind_rows(.id = "Nivel") %>% 
+    mutate(Escenario  = "Escn2",
+           Interesado = "SIGSA",
+           Nombre     =  if_else(is.na(Elemento),
+                                 Sistema,
+                                 Elemento)) %>% 
+    select(-Sistema, -Elemento) 
+  
+  temp3 <- valor.SIGSA.00 %>% 
+    bind_rows(.id = "Nivel") %>% 
+    mutate(Escenario  = "Escn3",
+           Interesado = "SIGSA",
+           Nombre     =  if_else(is.na(Elemento),
+                                 Sistema,
+                                 Elemento)) %>% 
+    select(-Sistema, -Elemento) 
+  
+  dfs <- bind_rows(temp, temp2, temp3)
+
+  # tercero -----------------------------------------------------------------  
+  
+  temp2 <- valor.3ro.10 %>% 
+    bind_rows(.id = "Nivel") %>% 
+    mutate(Escenario  = "Escn2",
+           Interesado = "Tercero",
+           Nombre     =  if_else(is.na(Elemento),
+                                 Sistema,
+                                 Elemento)) %>% 
+    select(-Sistema, -Elemento) 
+  
+  temp3 <- valor.3ro.00 %>% 
+    bind_rows(.id = "Nivel") %>% 
+    mutate(Escenario  = "Escn3",
+           Interesado = "Tercero",
+           Nombre     =  if_else(is.na(Elemento),
+                                 Sistema,
+                                 Elemento)) %>% 
+    select(-Sistema, -Elemento) 
+  
+  dfs <- bind_rows(dfs, temp2, temp3)
+  
+  dfs <- dfs %>% mutate(n = n,
+                 n.concesion.multi   = n.concesion.multi,
+                 n.concesion.poli    = n.concesion.poli,
+                 pct.pago.anticipado = pct.pago.anticipado,
+                 pct.royalty         = pct.royalty,
+                 r.ice               = r.ice,
+                 tipo.demanda        = tipo.demanda)
+  
+  temp <- proyecto %>% 
+    bind_rows(.id = "Nivel") %>% 
+    mutate(Motivo = "Proyecto",
+      Nombre     =  if_else(is.na(Elemento),
+                                 Sistema,
+                                 Elemento)) %>% 
+    select(-Sistema, -Elemento) 
+  
+  temp2 <- infraestructura %>% 
+    bind_rows(.id = "Nivel") %>% 
+    mutate(Motivo = "Infraestructura",
+      Nombre     =  if_else(is.na(Elemento),
+                                 Sistema,
+                                 Elemento)) %>% 
+    select(-Sistema, -Elemento) 
+  
+  canones.df <- bind_rows(temp, temp2)
+  canones.df <-  canones.df %>% mutate(n = n,
+                                n.concesion.multi   = n.concesion.multi,
+                                n.concesion.poli    = n.concesion.poli,
+                                pct.pago.anticipado = pct.pago.anticipado,
+                                pct.royalty         = pct.royalty,
+                                r.ice               = r.ice,
+                                tipo.demanda        = tipo.demanda)
+  
+  resultados <- list(Escenarios = escenarios, 
+                     Canones = canones, 
+                     Tasas = r.tasas,
+                     dfs = dfs,
+                     Canones.df = canones.df)
+  return(resultados)
+  }
+
+
+tmp <- modelo.base(pct.royalty = 0.,
+                   pct.pago.anticipado = 0.03,
+                   r.ice = 0.035,
   Demanda = Demanda,
   Tarifas = Tarifas,
   Costos  = Costos,
   Inversiones = Inversiones,
-  Ingresos.poliducto = Ingresos.poliducto
-)
+  Ingresos.poliducto = Ingresos.poliducto)
 
 
 tmp$Escenarios$SIGSA$Escenario.1$Sistema
@@ -1454,6 +1560,7 @@ tmp$Canones$Proyecto$Sistema
 tmp$Canones$Infraestructura$Sistema
 tmp$Escenarios$SIGSA$Escenario.2$Sistema
 tmp$Escenarios$SIGSA$Escenario.3$Sistema
-
+tmp$Escenarios$SIGSA$Escenario.1$Elemento
 tmp$Escenarios$Tercero$Escenario.2$Sistema
 tmp$Escenarios$Tercero$Escenario.3$Sistema
+tmp$Tasas
