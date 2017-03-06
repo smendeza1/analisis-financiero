@@ -1544,16 +1544,20 @@ modelo.base <- function(n                 = 30,
   return(resultados)
   }
 
-
-tmp <- modelo.base(pct.royalty = 0.,
-                   pct.pago.anticipado = 0.03,
-                   r.ice = 0.035,
+resultados$Escenarios$SIGSA$Escenario.1$Sistema
+tmp <- modelo.base(pct.royalty = 0,
+                   pct.pago.anticipado = 0,
+                   n.concesion.multi = 10,
+                   n.concesion.poli = 20,
+                   r.ice = 10,
+                   tipo.demanda = "min",
   Demanda = Demanda,
   Tarifas = Tarifas,
   Costos  = Costos,
   Inversiones = Inversiones,
   Ingresos.poliducto = Ingresos.poliducto)
 
+tmp <- modelo.base()
 
 tmp$Escenarios$SIGSA$Escenario.1$Sistema
 tmp$Canones$Proyecto$Sistema
