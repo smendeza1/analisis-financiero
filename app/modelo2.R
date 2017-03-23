@@ -13,7 +13,7 @@ Tarifas <- read_excel("app/Datos/Intermodal/Ingresos-2018-1poli.xlsx", sheet = "
 Costos <- read_excel("app/Datos/Intermodal/Costos e Inversiones-2018-1poli.xlsx", sheet = "Costos")
 Inversiones <- read_excel("app/Datos/Intermodal/Costos e Inversiones-2018-1poli.xlsx", sheet = "Inversiones")
 Ingresos.poliducto <- read_excel("app/Datos/Intermodal/Ingresos-2018-1poli.xlsx", sheet = "Ingresos")
-
+                      
 # 
 # 
 # # ##Datos para realizar modificaciones a la función
@@ -86,6 +86,7 @@ modelo.base <- function(n                 = 30,
                         pct.pago.anticipado = 0.045,
                         pg                = 2,
                         tasa.retorno.manual = FALSE,
+                        riesgo.pais = 0.0355, ## Valor tomado de Damodaran para GT Enero 2017
                         Demanda = Demanda,
                         Tarifas = Tarifas,
                         Costos  = Costos,
@@ -162,9 +163,9 @@ modelo.base <- function(n                 = 30,
     
     rf <- rf %>% str_replace("%","")
     rf <- as.numeric(rf)/100
-    expected.return <- rf + beta*(rm - rf + (2.89 + 3.55)/100)
+    expected.return <- rf + beta*(rm - rf + 2.89/100 + riesgo.pais)
     expected.return2 <- rf + beta*(rm - rf)
-    expected.return3 <- rf + as.numeric(re.beta$`Average Unlevered Beta`)*(rm - rf + (2.89 + 3.55)/100)
+    expected.return3 <- rf + as.numeric(re.beta$`Average Unlevered Beta`)*(rm - rf +  2.89/100 + riesgo.pais)
     expected.return4 <- rf + as.numeric(re.beta$`Average Unlevered Beta`)*(rm - rf)
     financial.data <- data.frame(expected.return, rf, rm,beta)
     
@@ -408,6 +409,54 @@ modelo.base <- function(n                 = 30,
   costos.elemento10 <- segmentar_costos(type = "ET")
   
   
+  # segmentar_depreciacion <- function(df = Costos, type) {
+  #   require(dplyr)
+  #   require(purrr)
+  #   
+  #   switch(type,
+  #          SF = df %>% 
+  #            mutate(Sistema = as.factor(Sistema)) %>%
+  #            split(df$Sistema) %>%
+  #            map(gather, Año, Valor, -c(Sistema:Componente)) %>%
+  #            map(filter, Tipo.Costo == "Reposicion") %>% 
+  #            map(mutate, Año = as.factor(Año)) %>%
+  #            map(group_by, Año) %>%
+  #            map(summarise, Depreciacion = sum(Valor)) %>% 
+  #            map(mutate, IVAxCobrar = Depreciacion*0.12),
+  #          ST = df %>% 
+  #            mutate(Sistema = as.factor(Sistema)) %>%
+  #            split(df$Sistema) %>%
+  #            map(gather, Año, Valor, -c(Sistema:Componente)) %>%
+  #            map(filter, Tipo.Costo == "Reposicion") %>% 
+  #            map(mutate, Año = as.factor(Año)) %>%
+  #            map(group_by, Año, Componente) %>%
+  #            map(summarise, Depreciacion = sum(Valor)) %>% 
+  #            map(mutate, IVAxCobrar = Depreciacion*0.12),
+  #          EF = df %>% 
+  #            mutate(Elemento = as.factor(Elemento)) %>%
+  #            split(df$Elemento) %>%
+  #            map(gather, Año, Valor, -c(Sistema:Componente)) %>%
+  #            map(filter, Tipo.Costo == "Reposicion") %>% 
+  #            map(mutate, Año = as.factor(Año)) %>%
+  #            map(group_by, Año) %>%
+  #            map(summarise, Depreciacion = sum(Valor)) %>% 
+  #            map(mutate, IVAxCobrar = Depreciacion*0.12),
+  #          ET = df %>% 
+  #            mutate(Elemento = as.factor(Elemento)) %>%
+  #            split(df$Elemento) %>%
+  #            map(gather, Año, Valor, -c(Sistema:Componente)) %>%
+  #            map(filter, Tipo.Costo == "Reposicion") %>% 
+  #            map(mutate, Año = as.factor(Año)) %>%
+  #            map(group_by, Año, Componente) %>%
+  #            map(summarise, Depreciacion = sum(Valor)) %>% 
+  #            map(mutate, IVAxCobrar = Depreciacion*0.12))
+  #   
+  # }
+  # 
+  # depreciacion.sistema11 <- segmentar_depreciacion(type = "SF")
+  # depreciacion.sistema10 <- segmentar_depreciacion(type = "SF")
+  # depreciacion.elemento11 <- segmentar_depreciacion(type = "EF")
+  # depreciacion.elemento10 <- segmentar_depreciacion(type = "ET")
   # Financiamiento ----------------------------------------------------------
   
   
@@ -651,6 +700,27 @@ modelo.base <- function(n                 = 30,
     }
   }
   
+  calcular_er <- function(df, horizonte = 2062, regimen.fiscal = FALSE){
+    df$regimen.fiscal <- regimen.fiscal
+    df <-  df %>% 
+      mutate(Año = as.numeric(Año)) %>% 
+      filter(Año <= horizonte) %>% 
+      arrange(Año) %>% 
+      mutate(IVA.Neto = if_else(IVA.Neto > 0,0,IVA.Neto),
+             ISR2 = if_else(regimen.fiscal == FALSE, ISR, (Ingresos.Brutos - Costos)*isr2),
+             Utilidad.operativa      =  Ingresos.Brutos
+             - Costos
+             - (Pago - Intereses),
+             Utilidad.antes.impuestos = Utilidad.operativa - Intereses,
+             Utilidad.neta = Utilidad.antes.impuestos - ISR2,
+             Dividendos.cumsum = cumsum(Utilidad.neta),
+             Dividendos = if_else(Dividendos.cumsum > 0, 0.85*Utilidad.neta, 0),
+             EPS = Utilidad.neta/282500,
+             DPS = Dividendos/282500) %>% 
+      select(-contains("aux"), regimen.fiscal, Inversion)
+    df
+  }
+  
   ### Parametros del modelo
   n.multi <- primer.año + n.concesion.multi
   n.poli <- primer.año + n.concesion.poli
@@ -661,21 +731,27 @@ modelo.base <- function(n                 = 30,
   
   
   params.completo <- list(df = list(df.sistema.completo11), r = r.input, horizonte = horizonte.input, res = res.input, regimen.fiscal = regimen.fiscal.input)
+  params.er.completo <- list(df = list(df.sistema.completo11), horizonte = horizonte.input, regimen.fiscal = regimen.fiscal.input)
   
   data <- df.sistema11
   horizonte.input <- list(n.poli, n.multi)
   params.sistema <- list(df = data, r = r.input, horizonte = horizonte.input, res = res.input, regimen.fiscal = regimen.fiscal.input)
-  
+  params.er.sistema <- list(df = data,  horizonte = horizonte.input, regimen.fiscal = regimen.fiscal.input)
+
   data <- df.elemento11
   horizonte.input <- list(n.multi, n.poli, n.multi, n.multi)
   params.elemento <- list(df = data, r = r.input, horizonte = horizonte.input, res = res.input, regimen.fiscal = regimen.fiscal.input)
-  
+  params.er.elemento <- list(df = data,  horizonte = horizonte.input, regimen.fiscal = regimen.fiscal.input)
   
   ### Calculo de vp base para cada modalidad
   
   valor.sistema.completo <- pmap(params.completo, calcular_fen)
   valor.sistema11 <- pmap(params.sistema, calcular_fen)
   valor.elemento11 <- pmap(params.elemento, calcular_fen)
+  
+  er.sistema.completo <- pmap(params.er.completo, calcular_er) 
+  er.sistema11 <- pmap(params.er.sistema, calcular_er)
+  er.elemento11 <- pmap(params.er.elemento, calcular_er)
   
   valor.sistema11 <- bind_rows(valor.sistema11, .id = "Sistema")
   valor.elemento11 <- bind_rows(valor.elemento11, .id = "Elemento")
@@ -731,13 +807,17 @@ modelo.base <- function(n                 = 30,
         tir = formattable::percent(tir)) %>% 
     map(select, -vp.fin, -vp.total)
   
+  er.11 <- list(Completo = er.sistema.completo, 
+                Sistema  = er.sistema11,
+                Elemento = er.elemento11)
+  
   
   # Calculo de canones Concesión e Infraestructura-------------------------------------------------
   
   ## Calculo valor de concesion
   
   concesion.completo <- valor.completo$vp.base %>%   
-    canon(tasa.descuento.ice = r.ice, 
+    canon(tasa.descuento.ice = -0.01, 
           n.canon = n.concesion.multi, 
           pg = pg, 
           pct.pago.anticipado = pct.pago.anticipado)
@@ -1006,6 +1086,7 @@ modelo.base <- function(n                 = 30,
         n = n,
         r = r)
   
+  
   financiamiento.elemento.3ro <- inversiones.elemento.3ro %>% 
     map2(ingresos.elemento11, left_join) %>% 
     map(amortizacion,
@@ -1022,7 +1103,6 @@ modelo.base <- function(n                 = 30,
         r = r)  %>% 
     map(ungroup) %>% 
     map(mutate, Año = as.numeric(as.character(Año)))
-  
   
   financiamiento.elemento.propios <- inversiones.elemento.propios %>% 
     map2(ingresos.elemento.propios, left_join) %>% 
@@ -1163,14 +1243,21 @@ modelo.base <- function(n                 = 30,
                          IVA.Neto = 0))
   
   params.sistema$df <- df.sistema.3ro
+  params.er.sistema$df <- df.sistema.3ro
   params.elemento$df <- df.elemento.3ro
+  params.er.elemento$df <- df.elemento.3ro
   valor.sistema.10.3ro <-  pmap(params.sistema, calcular_fen)
   valor.elemento.10.3ro <- pmap(params.elemento, calcular_fen)
+  er.sistema.10.3ro <-  pmap(params.er.sistema, calcular_er)
+  er.elemento.10.3ro <- pmap(params.er.elemento, calcular_er)
   
   params.sistema$df <- df.sistema.propios
+  params.er.sistema$df <- df.sistema.propios
   params.elemento$df <- df.elemento.propios
+  params.er.elemento$df <- df.elemento.propios
   valor.sistema.10.propio <- pmap(params.sistema, calcular_fen)
   valor.elemento.10.propio <- pmap(params.elemento, calcular_fen)
+  er.sistema.10.propio <- pmap(params.er.sistema, calcular_er)
   
   params.sistema.fin$r <- list(expected.return)
   params.elemento.fin$r <- list(expected.return)
@@ -1217,6 +1304,11 @@ modelo.base <- function(n                 = 30,
     map(mutate, 
         vp.base = formattable::currency(vp.base, digits = 0),
         tir     = formattable::percent(tir))
+  
+  er.10 <- list(Tercero = list(Sistema = er.sistema.10.3ro,
+                               Elemento = er.elemento.10.3ro),
+                SIGSA   = list(Sistema = er.sistema.10.propio,
+                               Elemento = er.sistema.10.propio))
   
   # Escenario 00 ------------------------------------------------------------
   
@@ -1398,17 +1490,22 @@ modelo.base <- function(n                 = 30,
   
   ## Valor 3ro
   params.sistema$df <- df.sistema.3ro.00
+  params.er.sistema$df <- df.sistema.3ro.00
   valor.sistema.00.3ro <-  pmap(params.sistema, calcular_fen) %>% bind_rows( .id = "Sistema")
+  er.sistema.00.3ro <- pmap(params.er.sistema, calcular_er)
   params.elemento$df <- df.elemento.3ro.00
   valor.elemento.00.3ro <-  pmap(params.elemento, calcular_fen) %>% bind_rows( .id = "Elemento")
   ## Valor SIGSA
   params.sistema$df <- df.sistema.propio.00
   params.sistema$r <- expected.return2
+  params.er.sistema$df <- df.sistema.propio.00
   valor.sistema.00.SIGSA <- pmap(params.sistema, calcular_fen) %>% bind_rows( .id = "Sistema")
+  er.sistema.00.SIGSA <- pmap(params.er.sistema, calcular_er)
   params.elemento$df <- df.elemento.propio.00
   params.elemento$r <- expected.return2
+  params.er.elemento$df <- df.elemento.propio.00
   valor.elemento.00.SIGSA <- pmap(params.elemento, calcular_fen) %>% bind_rows( .id = "Elemento")
-  
+  er.elemento.00.SIGSA <- pmap(params.er.elemento, calcular_er)
   
   
   valor.3ro.00 <- list(Sistema = valor.sistema.00.3ro, Elemento = valor.elemento.00.3ro)
@@ -1503,13 +1600,15 @@ modelo.base <- function(n                 = 30,
   
   dfs <- bind_rows(dfs, temp2, temp3)
   
-  dfs <- dfs %>% mutate(n = n,
+  dfs <- dfs %>% mutate(riesgo.pais = riesgo.pais,
+                        wacc         = wacc,
                  n.concesion.multi   = n.concesion.multi,
                  n.concesion.poli    = n.concesion.poli,
                  pct.pago.anticipado = pct.pago.anticipado,
                  pct.royalty         = pct.royalty,
                  r.ice               = r.ice,
-                 tipo.demanda        = tipo.demanda)
+                 tipo.demanda        = tipo.demanda,
+                 expected.return     = expected.return)
   
   temp <- proyecto %>% 
     bind_rows(.id = "Nivel") %>% 
@@ -1528,13 +1627,18 @@ modelo.base <- function(n                 = 30,
     select(-Sistema, -Elemento) 
   
   canones.df <- bind_rows(temp, temp2)
-  canones.df <-  canones.df %>% mutate(n = n,
+  canones.df <-  canones.df %>% mutate(riesgo.pais = riesgo.pais,
+                                       wacc         = wacc,
                                 n.concesion.multi   = n.concesion.multi,
                                 n.concesion.poli    = n.concesion.poli,
                                 pct.pago.anticipado = pct.pago.anticipado,
                                 pct.royalty         = pct.royalty,
                                 r.ice               = r.ice,
                                 tipo.demanda        = tipo.demanda)
+  
+  
+  
+ 
   
   resultados <- list(Escenarios = escenarios, 
                      Canones = canones, 
@@ -1547,9 +1651,9 @@ modelo.base <- function(n                 = 30,
 resultados$Escenarios$SIGSA$Escenario.1$Sistema
 tmp <- modelo.base(pct.royalty = 0,
                    pct.pago.anticipado = 0,
-                   n.concesion.multi = 10,
-                   n.concesion.poli = 20,
-                   r.ice = 10,
+                   n.concesion.multi = 50,
+                   n.concesion.poli = 30,
+                   r.ice = 0.03,
                    tipo.demanda = "min",
   Demanda = Demanda,
   Tarifas = Tarifas,
@@ -1557,7 +1661,9 @@ tmp <- modelo.base(pct.royalty = 0,
   Inversiones = Inversiones,
   Ingresos.poliducto = Ingresos.poliducto)
 
-tmp <- modelo.base()
+
+tmp$dfs
+
 
 tmp$Escenarios$SIGSA$Escenario.1$Sistema
 tmp$Canones$Proyecto$Sistema
