@@ -8,11 +8,11 @@ require(scales)
 require(purrr)
 require(rvest)
 # # Información utilizada por la función para poder funcionar
-Demanda <- read_excel("app/Datos/Intermodal/Ingresos-2018-1poli.xlsx", sheet = "Demanda")
-Tarifas <- read_excel("app/Datos/Intermodal/Ingresos-2018-1poli.xlsx", sheet = "Tarifas")
-Costos <- read_excel("app/Datos/Intermodal/Costos e Inversiones-2018-1poli.xlsx", sheet = "Costos")
-Inversiones <- read_excel("app/Datos/Intermodal/Costos e Inversiones-2018-1poli.xlsx", sheet = "Inversiones")
-Ingresos.poliducto <- read_excel("app/Datos/Intermodal/Ingresos-2018-1poli.xlsx", sheet = "Ingresos")
+Demanda <- read_excel("app/Datos/Intermodal/Ingresos-2018.xlsx", sheet = "Demanda")
+Tarifas <- read_excel("app/Datos/Intermodal/Ingresos-2018.xlsx", sheet = "Tarifas")
+Costos <- read_excel("app/Datos/Intermodal/Costos e Inversiones-2018.xlsx", sheet = "Costos")
+Inversiones <- read_excel("app/Datos/Intermodal/Costos e Inversiones-2018.xlsx", sheet = "Inversiones")
+Ingresos.poliducto <- read_excel("app/Datos/Intermodal/Ingresos-2018.xlsx", sheet = "Ingresos")
                       
 # 
 # 
@@ -1258,6 +1258,7 @@ modelo.base <- function(n                 = 30,
   valor.sistema.10.propio <- pmap(params.sistema, calcular_fen)
   valor.elemento.10.propio <- pmap(params.elemento, calcular_fen)
   er.sistema.10.propio <- pmap(params.er.sistema, calcular_er)
+  er.elemento.10.propio <- pmap(params.er.elemento, calcular_er)
   
   params.sistema.fin$r <- list(expected.return)
   params.elemento.fin$r <- list(expected.return)
@@ -1495,6 +1496,7 @@ modelo.base <- function(n                 = 30,
   er.sistema.00.3ro <- pmap(params.er.sistema, calcular_er)
   params.elemento$df <- df.elemento.3ro.00
   valor.elemento.00.3ro <-  pmap(params.elemento, calcular_fen) %>% bind_rows( .id = "Elemento")
+  er.elemento.00.3ro <- pmap(params.er.elemento, calcular_er)
   ## Valor SIGSA
   params.sistema$df <- df.sistema.propio.00
   params.sistema$r <- expected.return2
@@ -1626,6 +1628,8 @@ modelo.base <- function(n                 = 30,
                                  Elemento)) %>% 
     select(-Sistema, -Elemento) 
   
+
+  
   canones.df <- bind_rows(temp, temp2)
   canones.df <-  canones.df %>% mutate(riesgo.pais = riesgo.pais,
                                        wacc         = wacc,
@@ -1637,23 +1641,58 @@ modelo.base <- function(n                 = 30,
                                 tipo.demanda        = tipo.demanda)
   
   
+  # Estados de Resultados ---------------------------------------------------
   
- 
+  
+  combinar_er <- function(dfs, Escenario, Interesado, Nivel){
+    dfs <- dfs %>% bind_rows(.id = "Nombre")
+    dfs$Escenario <- Escenario
+    dfs$Interesado <- Interesado
+    dfs$Nivel <- Nivel
+    dfs
+  }
+  
+  ## 1er escenario
+  er.dfs <- combinar_er(er.sistema11, "Escn1", "SIGSA", "Sistema")
+  temp <- combinar_er(er.elemento11, "Escn1", "SIGSA", "Elemento")
+  er.dfs <- bind_rows(er.dfs, temp)
+  
+  ## 2do escenario
+  temp <- combinar_er(er.sistema.10.propio, "Escn2", "SIGSA", "Sistema")
+  er.dfs <- bind_rows(er.dfs, temp)
+  temp <- combinar_er(er.elemento.10.propio, "Escn2", "SIGSA", "Elemento")
+  er.dfs <- bind_rows(er.dfs, temp)
+  temp <- combinar_er(er.sistema.10.3ro, "Escn2", "Tercero", "Sistema")
+  er.dfs <- bind_rows(er.dfs, temp)
+  temp <- combinar_er(er.elemento.10.3ro, "Escn2", "Tercero", "Elemento")
+  er.dfs <- bind_rows(er.dfs, temp)
+  
+  ## 3ro escenario
+  temp <- combinar_er(er.sistema.00.SIGSA, "Escn3", "SIGSA", "Sistema")
+  er.dfs <- bind_rows(er.dfs, temp)
+  temp <- combinar_er(er.elemento.00.SIGSA, "Escn3", "SIGSA", "Elemento")
+  er.dfs <- bind_rows(er.dfs, temp)
+  temp <- combinar_er(er.sistema.00.3ro, "Escn3", "Tercero", "Sistema")
+  er.dfs <- bind_rows(er.dfs, temp)
+  temp <- combinar_er(er.elemento.00.3ro, "Escn3", "Tercero", "Elemento")
+  er.dfs <- bind_rows(er.dfs, temp)
+  er.dfs <- er.dfs %>% select(-contains("x"))
   
   resultados <- list(Escenarios = escenarios, 
                      Canones = canones, 
                      Tasas = r.tasas,
                      dfs = dfs,
+                     er.dfs = er.dfs,
                      Canones.df = canones.df)
   return(resultados)
   }
 
-resultados$Escenarios$SIGSA$Escenario.1$Sistema
-tmp <- modelo.base(pct.royalty = 0,
-                   pct.pago.anticipado = 0,
+
+tmp <- modelo.base(pct.royalty = 0.05,
+                   pct.pago.anticipado = 0.05,
                    n.concesion.multi = 50,
                    n.concesion.poli = 30,
-                   r.ice = 0.03,
+                   r.ice = 0.035,
                    tipo.demanda = "min",
   Demanda = Demanda,
   Tarifas = Tarifas,
@@ -1662,7 +1701,17 @@ tmp <- modelo.base(pct.royalty = 0,
   Ingresos.poliducto = Ingresos.poliducto)
 
 
-tmp$dfs
+tmp$er.dfs  %>%  View()
+  filter(Nivel == "Sistema", Escenario == "Escn3") %>% 
+  ggplot(aes(x = Año, y = DPS, col = Nombre)) +
+  # geom_col(position = "dodge") +
+  geom_hline(yintercept = 1, col = "red") +
+  geom_point() +
+  geom_smooth(method = "gam", formula = y ~ x, fullrange = TRUE) +
+  scale_y_continuous(breaks = pretty_breaks(10), labels = dollar) +
+  ggtitle("Dividends per share") +
+  axonr::theme_axon() +
+  facet_grid(Interesado~.)
 
 
 tmp$Escenarios$SIGSA$Escenario.1$Sistema
