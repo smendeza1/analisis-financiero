@@ -83,8 +83,8 @@ modelo.base <- function(n                 = 30,
                         split.puertos     = 0.5,
                         pct.royalty       = 0.05,
                         pct.gastos.comercializacion = 0.025,
-                        pct.pago.anticipado = 0.045,
-                        pg                = 2,
+                        pct.pago.anticipado = 0.010,
+                        pg                = 0,
                         tasa.retorno.manual = FALSE,
                         riesgo.pais = 0.0355, ## Valor tomado de Damodaran para GT Enero 2017
                         Demanda = Demanda,
@@ -347,7 +347,7 @@ modelo.base <- function(n                 = 30,
     
     
     pago.anticipado <- -pmt(r = tasa.descuento.ice,
-                            n = n.canon - pg,
+                            n = n.canon,
                             pv = valor,
                             fv = 0)*n.canon*pct.pago.anticipado
     
