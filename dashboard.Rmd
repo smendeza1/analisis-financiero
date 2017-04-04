@@ -37,7 +37,7 @@ Ingresos.poliducto <- read_excel("app/Datos/Intermodal/Ingresos-2018-1poli.xlsx"
 n                 = 30 # Tiempo financiamiento
 n.concesion.multi = 50
 n.concesion.poli  = 30
-r.ice             = 0.01 ## Tasa Canon Concesión
+r.ice             = 0.03 ## Tasa Canon Concesión
 r.infra           = 0.10
 tasa.retorno.manual = FALSE
 tasa.descuento    = 0.08
@@ -48,7 +48,7 @@ isr2              = 0.25
 horizonte         = 2062
 regimen.fiscal    = TRUE ## en donde FALSE indica regimen sobre ingresos
 split.puertos     = 0.50
-pct.royalty       = 0.08
+pct.royalty       = 0.05
 pct.gastos.comercializacion = 0.025
 pct.pago.anticipado = 0.045
 pg                = 2  ## periodo de gracia canon

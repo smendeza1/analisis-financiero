@@ -142,3 +142,64 @@ pvalues <- por_escenario %>%
 por_escenario %>% 
   unnest(Augment) %>% 
   View()
+
+er.sistema11 %>% bind_rows(.id = "Nombre") %>% 
+  ggplot(aes(x = Año, y = DPS, fill = Nombre, ymin = 0)) +
+  geom_col(position = "stack") +
+  scale_y_continuous(breaks = pretty_breaks(10), labels = dollar) +
+  ggtitle("Dividends per share") +
+  axonr::theme_axon() 
+
+er.sistema.10.propio %>%  bind_rows(.id = "Nombre") %>% 
+  ggplot(aes(x = Año, y = DPS, fill = Nombre, ymin = 0)) +
+  geom_col(position = "stack") +
+  scale_y_continuous(breaks = pretty_breaks(10), labels = dollar) +
+  ggtitle("Dividends per share") +
+  axonr::theme_axon() 
+
+er.sistema.10.3ro %>%  bind_rows(.id = "Nombre") %>% 
+  ggplot(aes(x = Año, y = DPS, fill = Nombre, ymin = 0)) +
+  geom_col(position = "stack") +
+  scale_y_continuous(breaks = pretty_breaks(10), labels = dollar) +
+  ggtitle("Dividends per share") +
+  axonr::theme_axon() 
+
+
+
+
+er.sistema.00.SIGSA %>%  bind_rows(.id = "Nombre") %>% 
+  ggplot(aes(x = Año, y = DPS, fill = Nombre)) +
+  geom_col(position = "stack") +
+  scale_y_continuous(breaks = pretty_breaks(10), labels = dollar) +
+  ggtitle("Dividends per share") +
+  axonr::theme_axon()
+
+
+
+er.sistema.00.3ro %>%  bind_rows(.id = "Nombre") %>% 
+  ggplot(aes(x = Año, y = DPS, fill = Nombre)) +
+  geom_col(position = "stack") +
+  scale_y_continuous(breaks = pretty_breaks(10), labels = dollar) +
+  ggtitle("Dividends per share") +
+  axonr::theme_axon()
+
+
+er.sistema.00.SIGSA %>%  bind_rows(.id = "Nombre") %>% 
+  ggplot(aes(x = Año, y = DPS, col = Nombre)) +
+  geom_point() +
+  geom_smooth(method = "gam", formula = y ~ x, fullrange = TRUE) +
+  scale_y_continuous(breaks = pretty_breaks(10), labels = dollar) +
+  ggtitle("Dividends per share") +
+  axonr::theme_axon()
+
+er.dfs %>%  
+  filter(Nivel == "Sistema", Escenario == "Escn3") %>% 
+  ggplot(aes(x = Año, y = DPS, fill = Nombre)) +
+  geom_col(position = "stack") +
+  geom_hline(yintercept = 1, col = "red") +
+  # geom_point() +
+  # geom_smooth(method = "gam", formula = y ~ x, fullrange = TRUE) +
+  scale_y_continuous(breaks = pretty_breaks(10), labels = dollar) +
+  ggtitle("Dividends per share") +
+  axonr::theme_axon() +
+  facet_grid(Interesado~.)
